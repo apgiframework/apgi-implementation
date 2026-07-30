@@ -6,7 +6,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
 ## Overview
-APGI is a unified computational framework for modeling allostatic threshold dynamics in biological systems. It integrates signal processing, precision-weighted accumulation, threshold adaptation, and ignition mechanisms with optional advanced features including Kuramoto oscillators, reservoir computing, and thermodynamic constraints.
+APGI is a computational framework for modeling allostatic threshold dynamics in biological systems. It integrates signal processing, precision-weighted accumulation, threshold adaptation, and ignition mechanisms with optional advanced features including Kuramoto oscillators, reservoir computing, and thermodynamic constraints.
+
 **Key Features:**
 - ✅ Complete signal preprocessing pipeline (§1)
 - ✅ Free Energy Principle-grounded precision system (§2)
@@ -312,27 +313,6 @@ python -m pytest tests/ --cov=. --cov-report=html
 | Memory (per 1000 steps) | ~1 MB | History storage |
 | Test suite | ~2.5 s | 799 tests |
 | Examples | < 30 s | All 15 examples |
----
-## Specification Compliance
-### Overall Rating: 98/100 ✅
-| Section | Topic | Rating | Status |
-| :--- | :--- | :--- | :--- |
-| 1 | Signal Preprocessing | 95/100 | ✅ |
-| 2 | Precision System | 95/100 | ✅ |
-| 3 | Signal Accumulation | 95/100 | ✅ |
-| 4 | Dynamic Threshold | 95/100 | ✅ |
-| 5 | Ignition Mechanism | 95/100 | ✅ |
-| 6 | Post-Ignition Reset | 95/100 | ✅ |
-| 7 | Continuous-Time SDE | 95/100 | ✅ |
-| 8 | Hierarchical Architecture | 95/100 | ✅ |
-| 9 | Oscillatory Coupling | 95/100 | ✅ |
-| 10 | Reservoir Implementation | 95/100 | ✅ |
-| 11 | Thermodynamic Constraints | 95/100 | ✅ |
-| 12 | Statistical Validation | 95/100 | ✅ |
-| 13 | Execution Pipeline | 95/100 | ✅ |
-| 14 | Observable Mapping | 95/100 | ✅ |
-| 15 | Design Constraints | 95/100 | ✅ |
-| 19 | Active Inference Loop | 95/100 | ✅ |
 ---
 ## Key Features
 ### Signal Processing
