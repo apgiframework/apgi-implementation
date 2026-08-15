@@ -1,0 +1,26 @@
+# APGI: Allostatic Precision-Gated Ignition framework
+
+# Core dependencies (required)
+# NumPy capped at <2.0 to guarantee bit-for-bit reproducibility
+# NumPy 2.0+ introduces breaking changes to C-APIs and type promotion
+numpy>=1.24.0,<2.0
+pydantic>=2.0.0,<3.0
+structlog>=24.1.0,<26.0
+
+# Scientific computing (optional but recommended)
+scipy>=1.10.0,<2.0
+
+# Visualization (optional)
+matplotlib>=3.7.0,<4.0
+
+# Data processing (optional)
+pandas>=2.0.0,<3.0
+
+# Development and testing dependencies
+pytest>=7.0.0,<9.0
+pytest-cov>=4.0.0,<8.0
+pytest-mock>=3.10.0,<4.0
+
+# Code quality tools (exact pins for reproducible linting/formatting)
+ruff==0.16.0
+mypy==1.19.0

@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/apgiframework/apgi-implementation/actions/workflows/ci.yml/badge.svg)](https://github.com/apgiframework/apgi-implementation/actions/workflows/ci.yml)
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.21632264-blue)](https://doi.org/10.5281/zenodo.21632264)
+[![OSF](https://img.shields.io/badge/OSF-t5hcq-lightblue)](https://osf.io/t5hcq)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
@@ -445,15 +446,36 @@ python -m pytest tests/ -v
 - [Hierarchy Power Spectrum](examples/15_hierarchy_power_spectrum.py) - Power spectrum analysis
 ---
 ## License
-[Specify license here]
+
+This software is licensed under the MIT License. See the [LICENSE](LICENSE) file for the complete license text.
+
+The APGI reference implementation is released as a DOI-archived replication artifact on [Zenodo](https://doi.org/10.5281/zenodo.21632264) for permanent archival and reproducibility.
+
 ---
 ## Citation
-If you use APGI in your research, please cite:
+
+To cite the reference implementation, please use:
+
 ```bibtex
-@software{apgi2026,
-  title={APGI: Allostatic Precision-Gated Ignition},
-  author={[Author Name]},
+@software{pesochin_apgi_2026,
+  title={APGI: Allostatic Precision-Gated Ignition — Reference Implementation},
+  author={Pesochin, Dimitry},
   year={2026},
-  url={https://github.com/[repository-url]}
+  version={1.0.0},
+  doi={10.5281/zenodo.21632264},
+  url={https://github.com/apgiframework/apgi-implementation}
 }
 ```
+
+To cite the theoretical framework and epistemic architecture, please refer to the companion manuscripts archived in the following locations:
+
+- **Zenodo Manuscript Records:** [APGI Framework on Zenodo](https://doi.org/10.5281/zenodo.21632264)
+- **OSF Preregistration:** [APGI OSF Project](https://osf.io/t5hcq)
+- **OSF Registries:** [APGI Registry](https://osf.io/registries/your-registry-id/)
+
+The tripartite open-science infrastructure comprises:
+1. **GitHub:** Source code version control
+2. **Zenodo:** Permanent DOI-archived release snapshots
+3. **OSF:** Preregistration, supplementary materials, and registry links
+
+---

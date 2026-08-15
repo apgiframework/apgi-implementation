@@ -17,7 +17,9 @@ date-released: "2026-07-29"
 repository-code: "https://github.com/apgiframework/apgi-implementation"
 url: "https://doi.org/10.5281/zenodo.21632264"
 authors:
-  - name: "APGI Framework contributors"
+  - family-names: Pesochin
+    given-names: Dimitry
+    orcid: "https://orcid.org/0009-0005-0328-2896"
 keywords:
   - neuroscience
   - consciousness
@@ -32,16 +34,22 @@ references:
     year: 2026
     notes: "Companion specification, version 1.0 (2026-07-28)."
     authors:
-      - name: "APGI Framework contributors"
+      - family-names: Pesochin
+        given-names: Dimitry
+        orcid: "https://orcid.org/0009-0005-0328-2896"
   - type: article
     title: "APGI Mathematical Specification"
     year: 2026
     notes: "Companion specification, version 1.0 (2026-07-29)."
     authors:
-      - name: "APGI Framework contributors"
+      - family-names: Pesochin
+        given-names: Dimitry
+        orcid: "https://orcid.org/0009-0005-0328-2896"
   - type: article
     title: "APGI Notation Appendix"
     year: 2026
     notes: "Canonical notation and parameter ranges, version 1.0 (2026-07-28)."
     authors:
-      - name: "APGI Framework contributors"
+      - family-names: Pesochin
+        given-names: Dimitry
+        orcid: "https://orcid.org/0009-0005-0328-2896"
