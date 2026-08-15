@@ -19,7 +19,7 @@ license = "MIT"
 license-files = ["LICENSE"]
 keywords = ["neuroscience", "computational-model", "precision-weighting", "ignition"]
 authors = [
-    {name = "Dimitry Pesochin", email = "dimitry@apgiframework.com"}
+    {name = "Dimitry Pesochin", email = "dimitry@apgiframework.com", orcid = "https://orcid.org/0009-0005-0328-2896"}
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",

@@ -6,24 +6,23 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
-## Overview
 APGI is a computational framework for modeling allostatic threshold dynamics in biological systems. It integrates signal processing, precision-weighted accumulation, threshold adaptation, and ignition mechanisms with optional advanced features including Kuramoto oscillators, reservoir computing, and thermodynamic constraints.
 
 **Key Features:**
-- ✅ Complete signal preprocessing pipeline (§1)
-- ✅ Free Energy Principle-grounded precision system (§2)
-- ✅ Precision-weighted signal accumulation (§3)
-- ✅ Allostatic threshold dynamics (§4)
-- ✅ Hard and soft ignition mechanisms (§5)
-- ✅ Post-ignition reset and refractory periods (§6)
-- ✅ Continuous-time SDE formulation (§7)
-- ✅ Hierarchical multi-timescale architecture (§8)
-- ✅ Kuramoto oscillators with phase coupling (§9)
-- ✅ Liquid state machine reservoir layer (§10)
-- ✅ Landauer's principle thermodynamic grounding (§11)
-- ✅ Observable mapping to neural/behavioral data (§14)
-- ✅ Fixed-point stability analysis (§7)
-- ✅ Comprehensive parameter validation (§15)
+- ✅ Complete signal preprocessing pipeline
+- ✅ Free Energy Principle-grounded precision system
+- ✅ Precision-weighted signal accumulation
+- ✅ Allostatic threshold dynamics
+- ✅ Hard and soft ignition mechanisms
+- ✅ Post-ignition reset and refractory periods
+- ✅ Continuous-time SDE formulation
+- ✅ Hierarchical multi-timescale architecture
+- ✅ Kuramoto oscillators with phase coupling
+- ✅ Liquid state machine reservoir layer
+- ✅ Landauer's principle thermodynamic grounding
+- ✅ Observable mapping to neural/behavioral data
+- ✅ Fixed-point stability analysis
+- ✅ Comprehensive parameter validation
 ---
 ## Quick Start
 ### Installation
@@ -129,16 +128,14 @@ python examples/15_hierarchy_power_spectrum.py
 ## Documentation
 ### Getting Started
 - **[API Reference](docs/API-REFERENCE.md)** - Complete API documentation
-- **[Quick Start Guide](examples/01_basic_usage.py)** - Basic usage example
 - **[Parameter Constraints](docs/PARAMETER-CONSTRAINTS.md)** - Parameter guide
 ### Understanding the System
 - **[Design Choices](docs/DESIGN-CHOICES.md)** - Implementation rationale
 - **[Specification](docs/APGI-Specs.md)** - Full mathematical specification
-- **[Observable Mapping](examples/03_observable_mapping.py)** - Neural/behavioral observables
+- **[APGI Overview](docs/APGI.md)** - Mathematical framework overview
+- **[Thermodynamic Grounding](docs/APGI-Thermodynamic-Grounding.md)** - Landauer's principle analysis
 ### Troubleshooting & Advanced Topics
 - **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Common errors and solutions
-- **[Advanced Features](examples/02_advanced_features.py)** - Kuramoto, reservoir, stability
-- **[Thermodynamics](examples/04_thermodynamics.py)** - Landauer's principle analysis
 ### Spectral & Hierarchical
 - **[Spectral Validation](docs/SPECTRAL-VALIDATION.md)** - 1/f spectral validation guide
 - **[Hierarchical Guide](docs/HIERARCHICAL-GUIDE.md)** - Multi-timescale architecture guide
@@ -147,51 +144,51 @@ python examples/15_hierarchy_power_spectrum.py
 ### Core Components
 ```text
 APGIPipeline
-├── Signal Preprocessing (§1)
+├── Signal Preprocessing
 │   ├── Prediction error computation
 │   ├── Online variance estimation
 │   └── Z-score normalization
-├── Precision System (§2)
+├── Precision System
 │   ├── Precision computation
 │   ├── Neuromodulatory gains (ACh, NE, DA)
 │   └── Precision ODE (optional)
-├── Signal Accumulation (§3)
+├── Signal Accumulation
 │   ├── Leaky integration
 │   └── Log-compression (optional)
-├── Threshold Dynamics (§4)
+├── Threshold Dynamics
 │   ├── Metabolic cost computation
 │   ├── Information value computation
 │   └── Allostatic update rule
-├── Ignition Mechanism (§5)
+├── Ignition Mechanism
 │   ├── Hard threshold
 │   └── Soft threshold (sigmoid)
-├── Post-Ignition Reset (§6)
+├── Post-Ignition Reset
 │   ├── Signal reset
 │   └── Refractory period
-├── Continuous-Time SDE (§7)
+├── Continuous-Time SDE
 │   ├── Euler-Maruyama integration
 │   └── Noise-precision duality
-├── Hierarchical Architecture (§8) [Optional]
+├── Hierarchical Architecture
 │   ├── Multi-timescale leaky integrators
 │   ├── Cross-level modulation
 │   └── Weighted aggregation
-├── Kuramoto Oscillators (§9) [Optional]
+├── Kuramoto Oscillators
 │   ├── Coupled phase dynamics
 │   ├── Ornstein-Uhlenbeck noise
 │   └── Phase reset on ignition
-├── Reservoir Layer (§10) [Optional]
+├── Reservoir Layer 
 │   ├── Fixed random weights
 │   ├── Ridge regression readout
 │   └── Suprathreshold amplification
-├── Thermodynamics (§11) [Optional]
+├── Thermodynamics
 │   ├── Landauer cost computation
 │   ├── Information bit counting
 │   └── Metabolic efficiency analysis
-├── Observable Mapping (§14) [Optional]
+├── Observable Mapping
 │   ├── Neural observable extraction
 │   ├── Behavioral observable extraction
 │   └── Key prediction validation
-└── Stability Analysis (§7) [Optional]
+└── Stability Analysis 
     ├── Jacobian computation
     ├── Eigenvalue analysis
     └── Bifurcation detection
@@ -426,6 +423,8 @@ python -m pytest tests/ -v
 - [API Reference](docs/API-REFERENCE.md) - Complete API documentation
 - [Design Choices](docs/DESIGN-CHOICES.md) - Implementation rationale
 - [Parameter Constraints](docs/PARAMETER-CONSTRAINTS.md) - Parameter guide
+- [APGI Overview](docs/APGI.md) - Mathematical framework overview
+- [Thermodynamic Grounding](docs/APGI-Thermodynamic-Grounding.md) - Landauer's principle analysis
 - [Spectral Validation](docs/SPECTRAL-VALIDATION.md) - 1/f spectral analysis guide
 - [Hierarchical Guide](docs/HIERARCHICAL-GUIDE.md) - Multi-timescale architecture guide
 - [Troubleshooting](docs/TROUBLESHOOTING.md) - Common errors and solutions
@@ -463,7 +462,8 @@ To cite the reference implementation, please use:
   year={2026},
   version={1.0.0},
   doi={10.5281/zenodo.21632264},
-  url={https://github.com/apgiframework/apgi-implementation}
+  url={https://github.com/apgiframework/apgi-implementation},
+  orcid={https://orcid.org/0009-0005-0328-2896}
 }
 ```
 
