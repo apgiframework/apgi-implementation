@@ -24,7 +24,7 @@ def test_show_info_execution(capsys):
     show_info()
     captured = capsys.readouterr()
     assert "APGI: Allostatic Precision-Gated Ignition" in captured.out
-    assert "Version: 1.0.0" in captured.out
+    assert "Version: 1.1.0" in captured.out
 
 
 def test_analyze_signal_statistics_exception():

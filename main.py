@@ -1,4 +1,4 @@
-"""APGI (Adaptive Precision Gated Ignition) - Main Entry Point
+"""APGI (Allostatic Precision-Gated Ignition) - Main Entry Point
 Available Options:
     --demo, --steps, --output, --multiscale, --levels, --k
     --ne-on-threshold, --gamma-ne, --beta, --stochastic, --seed
@@ -25,6 +25,9 @@ from core.rng import RNGLike, resolve_rng, seed_everything
 from hierarchy.multiscale import build_timescales, multiscale_weights
 from pipeline import APGIPipeline
 from stats.hurst import estimate_hurst_robust
+
+# Release version; keep in step with pyproject.toml and CITATION.cff.
+APGI_VERSION = "1.1.0"
 
 # Initialize logger at module level
 logger = get_logger("apgi.main")
@@ -344,7 +347,7 @@ def show_info() -> None:
     print("\n" + "=" * 60)
     print("APGI: Allostatic Precision-Gated Ignition")
     print("=" * 60)
-    print("\nVersion: 1.0.0")
+    print(f"\nVersion: {APGI_VERSION}")
     print("Description: Unified computational framework for modeling")
     print("             allostatic threshold dynamics in biological systems")
     print("\n" + "-" * 60)
@@ -380,7 +383,7 @@ def show_info() -> None:
 def main() -> int:
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="APGI (Adaptive Precision Gated Ignition) Simulation",
+        description="APGI (Allostatic Precision-Gated Ignition) Simulation",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -493,7 +496,7 @@ Examples:
         config["gamma_ne"] = args.gamma_ne
     logger.info(
         "apgi_startup",
-        version="1.0.0",
+        version=APGI_VERSION,
         demo=args.demo,
         strict_mode=args.strict_mode,
         max_history=args.max_history,
