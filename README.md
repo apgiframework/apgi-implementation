@@ -460,7 +460,7 @@ To cite the reference implementation, please use:
   title={APGI: Allostatic Precision-Gated Ignition — Reference Implementation},
   author={Pesochin, Dimitry},
   year={2026},
-  version={1.0.0},
+  version={1.1.0},
   doi={10.5281/zenodo.21632264},
   url={https://github.com/apgiframework/apgi-implementation},
   orcid={https://orcid.org/0009-0005-0328-2896}

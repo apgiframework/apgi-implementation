@@ -11,9 +11,9 @@ abstract: >-
   reservoir substrate, and Landauer-grounded thermodynamic constraints.
 type: software
 license: MIT
-version: "1.0.0"
+version: "1.1.0"
 doi: 10.5281/zenodo.21632264
-date-released: "2026-07-29"
+date-released: "2026-10-17"
 repository-code: "https://github.com/apgiframework/apgi-implementation"
 url: "https://doi.org/10.5281/zenodo.21632264"
 authors:

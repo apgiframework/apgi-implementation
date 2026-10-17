@@ -3,8 +3,8 @@ requires = ["setuptools>=77.0", "wheel"]
 build-backend = "setuptools.build_meta"
 [project]
 name = "apgi"
-version = "1.0.0"
-description = "Allostatic Precision Gated Ignition - A neuroscience-inspired computational framework"
+version = "1.1.0"
+description = "Allostatic Precision-Gated Ignition (APGI): reference implementation of the computational framework"
 readme = "README.md"
 # 3.10+, not 3.9. The codebase uses PEP 604 unions in RUNTIME positions, not
 # just annotations — e.g. core/sde.py's module-level
@@ -19,7 +19,7 @@ license = "MIT"
 license-files = ["LICENSE"]
 keywords = ["neuroscience", "computational-model", "precision-weighting", "ignition"]
 authors = [
-    {name = "Dimitry Pesochin", email = "dimitry@apgiframework.com", orcid = "https://orcid.org/0009-0005-0328-2896"}
+    {name = "Dimitry Pesochin", email = "dimitry@apgiframework.com"}
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
