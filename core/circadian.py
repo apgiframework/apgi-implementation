@@ -154,7 +154,7 @@ def circadian_theta_offset_array(
     if T_circ <= 0:
         raise ValueError(f"T_circ must be > 0, got {T_circ}")
     t = np.asarray(t_array, dtype=float)
-    return A_circ * np.cos(2.0 * np.pi * t / T_circ + phi_circ)
+    return np.asarray(A_circ * np.cos(2.0 * np.pi * t / T_circ + phi_circ))
 
 
 def ultradian_theta_offset_array(
@@ -167,7 +167,7 @@ def ultradian_theta_offset_array(
     if T_ultradian <= 0:
         raise ValueError(f"T_ultradian must be > 0, got {T_ultradian}")
     t = np.asarray(t_array, dtype=float)
-    return A_ultradian * np.cos(2.0 * np.pi * t / T_ultradian + phi_ultradian)
+    return np.asarray(A_ultradian * np.cos(2.0 * np.pi * t / T_ultradian + phi_ultradian))
 
 
 # ── Stateful regulator ────────────────────────────────────────────────────────

@@ -196,11 +196,14 @@ class TestReferenceModelDeterminism:
         """Seeding the process-global generator must not change a seeded model run."""
         from model_registry import create_model
 
-        seed_everything(1)
-        a = create_model("apgi_reduced", seed=5).run(_stimulus())
-        seed_everything(999)
-        np.random.seed(0)
-        b = create_model("apgi_reduced", seed=5).run(_stimulus())
+        try:
+            seed_everything(1)
+            a = create_model("apgi_reduced", seed=5).run(_stimulus())
+            seed_everything(999)
+            np.random.seed(0)
+            b = create_model("apgi_reduced", seed=5).run(_stimulus())
+        finally:
+            seed_everything(None)  # do not leave a fixed global stream for later tests
         assert np.array_equal(a["S"], b["S"]) and np.array_equal(a["B"], b["B"])
 
 

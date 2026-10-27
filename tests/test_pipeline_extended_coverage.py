@@ -133,6 +133,9 @@ def test_pipeline_bold_calibration():
     config["use_bold_calibration"] = True
     config["use_realistic_cost"] = True  # Needed for BOLD path
     config["enforce_landauer"] = True  # Trigger bold path in threshold.py
+    # Seeded: with seed=None the SDE noise comes from the process-global generator,
+    # so whether C = c1*S is positive depended on how many draws earlier tests made.
+    config["seed"] = 0
     p = APGIPipeline(config)
     res = p.step(x_e=1.0, x_i=0.5)
     assert "C" in res
