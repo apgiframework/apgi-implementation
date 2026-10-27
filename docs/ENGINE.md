@@ -72,7 +72,7 @@ a second.
 ## K7: identifiability → recovery → gate table
 
 ```bash
-python tools/run_k7.py --out gates --subjects 60            # DE-MC estimator (default)
+python tools/run_k7.py --out gates --subjects 60            # DE-MC, 3000 draws x 12 chains
 python tools/run_k7.py --out /tmp/try --subjects 10 --estimator laplace   # quick look
 ```
 
