@@ -15,7 +15,7 @@ branch protection can require it by name. Each gate is a pytest marker (register
 Supporting jobs that are also worth requiring: `dependency policy and qualification`
 (`tools/check_dependencies.py`, `python -m qualification.reference`) and
 `PyMC model matches the numpy reference` (`tests/test_estimation_pymc.py`, in its own
-environment because PyMC needs numpy>=2).
+environment so the heavy PyMC install cannot disturb the other jobs).
 
 ## Making the gates required
 

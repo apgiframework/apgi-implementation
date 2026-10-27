@@ -82,7 +82,7 @@ def test_run_k7_is_seed_reproducible(tmp_path):
 
 @pytest.mark.skipif(not (GATES / "gate-table.json").is_file(), reason="gate table not generated")
 class TestCommittedGateTable:
-    @pytest.fixture(scope="class")
+    @pytest.fixture(scope="module")
     def table(self):
         return json.loads((GATES / "gate-table.json").read_text())
 

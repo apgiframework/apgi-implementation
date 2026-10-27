@@ -36,8 +36,10 @@ apgi-framework  ──►  apgi-implementation  ──►  apgi-system
 ## Pinned third-party packages
 
 Every runtime and optional dependency carries an upper bound or an exact pin in
-`pyproject.toml` and `requirements.txt`. PyMC is optional (`apgi[estimation]`);
-the numpy estimators in `estimation/fitting.py` need nothing beyond `scipy`.
+`pyproject.toml` and `requirements.txt`. Bounds stop at the next major version (for example
+`numpy>=1.24,<3.0`) so installation works on current Python releases without disturbing other
+packages. PyMC is optional (`apgi[estimation]`); the numpy estimators in
+`estimation/fitting.py` need nothing beyond `scipy`.
 
 ## Deprecations
 

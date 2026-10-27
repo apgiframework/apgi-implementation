@@ -449,7 +449,7 @@ def _fake_k7a(**over):
 
 
 class TestGateTable:
-    @pytest.fixture(scope="class")
+    @pytest.fixture(scope="module")
     def result(self):
         return run_recovery(24, FULL, rng=11)
 

@@ -26,17 +26,25 @@ APGI is a computational framework for modeling allostatic threshold dynamics in 
 ---
 ## Quick Start
 ### Installation
+**macOS / Linux (recommended):** one command, no sudo, nothing touches your system Python.
 ```bash
-# Clone repository
-git clone <repository-url>
+git clone https://github.com/apgiframework/apgi-implementation.git
 cd apgi-implementation
-# Install with core dependencies
-pip install -e .
-# Or install with all optional dependencies
-pip install -e ".[all]"
-# Verify installation
-python -m pytest tests/ -v
+./install.sh            # creates ./.venv and installs numpy, scipy, matplotlib, pydantic, structlog
+source .venv/bin/activate
+apgi --steps 100 --seed 42
 ```
+`./install.sh --dev` adds the test and lint tools (`python -m pytest tests -q`); `./install.sh --pymc`
+adds PyMC. You need Python 3.10 or newer (`brew install python` on a Mac without one).
+
+**Manual install (any platform):**
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[analysis]"      # or  pip install -e .  for the bare core
+```
+Always use a virtual environment. If you previously ran `pip install -e . --break-system-packages`
+and another package complains about numpy, repair it with `pip install -U numpy scipy`: APGI works with
+numpy 1.24 and 2.x.
 ### Basic Usage
 ```python
 from pipeline import APGIPipeline

@@ -14,7 +14,14 @@ PYTHON      ?= python3
 OUTPUT_DIR   = outputs
 EXAMPLES_DIR = examples
 
-.PHONY: reproduce-paper manifest figure-s1 figure-07 figure-08 test lint clean clean-outputs
+.PHONY: install install-dev reproduce-paper manifest figure-s1 figure-07 figure-08 test lint clean clean-outputs
+
+## One-step install into ./.venv (see install.sh)
+install:
+	./install.sh
+
+install-dev:
+	./install.sh --dev
 
 ## Primary target: reproduce all paper figures
 reproduce-paper: $(OUTPUT_DIR)

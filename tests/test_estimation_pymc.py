@@ -1,8 +1,7 @@
 """PyMC transcription of the reference likelihood (S1-IMP-09.1).
 
-Skipped unless PyMC is importable. In CI it runs in a dedicated job whose
-environment resolves PyMC/PyTensor (they need numpy>=2, which the main
-environment caps below).
+Skipped unless PyMC is importable (`pip install "apgi[estimation]"`). In CI it runs in a
+dedicated job so the heavy PyMC install cannot disturb the other jobs.
 """
 
 from __future__ import annotations

@@ -109,9 +109,7 @@ python tools/run_k7.py --out /tmp/try --subjects 10 --estimator laplace   # quic
   along the `α–Π–β` ridge. Gate tables come from `mcmc`. PyMC NUTS is available
   (`estimation/pymc_models.py`, `pip install apgi[estimation]`) and is checked against the numpy
   likelihood in CI, but it is too slow to run per subject at K7c scale here.
-* `estimation` needs only `numpy`/`scipy`; PyMC's current releases require numpy>=2 while this
-  package caps numpy below 2 for the published figures, so install the extra into a separate
-  environment (see `DEPENDENCY-MATRIX.md`).
+* `estimation` needs only `numpy`/`scipy`; PyMC is optional (`pip install "apgi[estimation]"`).
 * Noise levels `σ_r`, `σ_y` are treated as known (0.15, 0.10); the design is 240 trials with a
   reversal every 30. Other designs need their own K7 run.
 

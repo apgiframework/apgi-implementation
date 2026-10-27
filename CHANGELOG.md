@@ -35,6 +35,13 @@ See `docs/ENGINE.md` for the item-by-item map.
   smoke, plus dependency-policy and PyMC jobs (`docs/CI-GATES.md`).
 
 ### Changed
+- Installation: dependency caps relaxed (`numpy>=1.24,<3.0`, `pandas<4`, `structlog<27`, `ruff`/`mypy`
+  as ranges). The old `numpy<2.0` cap forced a source build of numpy 1.26 on current Python releases and
+  uninstalled the user's numpy 2.x, breaking scipy and matplotlib. The suite passes on numpy 2.5 / scipy
+  1.18 / pandas 3.1 / pytest 9.
+- `install.sh` (and `make install`): one-step venv install for macOS/Linux with a smoke test.
+- CI: coverage floor 85%; ruff-format, mypy, pip-audit and the performance job are advisory;
+  third-party deprecation warnings no longer fail tests; macOS install job.
 - `pyproject.toml`: new packages in the wheel; upper bounds on the optional `scipy`/`matplotlib`
   requirements (they were the only unbounded dependencies); `estimation` extra.
 - `.coveragerc`: `estimation/pymc_models.py` is covered by its own CI job, not the main one.
