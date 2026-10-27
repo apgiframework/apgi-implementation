@@ -139,6 +139,10 @@ python examples/15_hierarchy_power_spectrum.py
 ### Spectral & Hierarchical
 - **[Spectral Validation](docs/SPECTRAL-VALIDATION.md)** - 1/f spectral validation guide
 - **[Hierarchical Guide](docs/HIERARCHICAL-GUIDE.md)** - Multi-timescale architecture guide
+### Computation engine & desk science
+- **[Computation Engine](docs/ENGINE.md)** - model variants, the qualified reference `apgi_reduced`, K7 identifiability/recovery, run manifests
+- **[CI Gates](docs/CI-GATES.md)** - the required gates and how to run each locally
+- **[Dependency Matrix](DEPENDENCY-MATRIX.md)** - ownership, dependency direction, deprecations
 ---
 ## Architecture
 ### Core Components
@@ -235,6 +239,15 @@ apgi-implementation/
 │   ├── bold_calibration.py        # BOLD calibration
 │   ├── calibration_utils.py      # Calibration utilities
 │   └── thermodynamics.py          # Thermodynamic constraints
+├── models/                        # Seven model variants; apgi_reduced is the qualified reference
+├── model_registry/                # Variant registry, parameter mapping
+├── engine/                        # Prediction error, somatic gain, ignition sim, latent state, counterfactuals, provenance
+├── estimation/                    # Likelihood, MCMC/PyMC, K7a identifiability, K7c recovery, gate table
+├── adapters/                      # Canonical inputs/outputs, version adapter
+├── runtime/                       # Session engine, checkpoints, batch runner, run manifest
+├── qualification/                 # Executable qualification of apgi_reduced
+├── tools/                         # check_dependencies.py, run_k7.py
+├── gates/                         # K7 results and the per-parameter gate table
 ├── tests/                         # Test suite (100+ test files)
 ├── examples/                      # Example scripts (15 examples)
 ├── docs/                          # Documentation

@@ -19,6 +19,9 @@ omit =
     */.venv/*
     build/*
     dist/*
+    # Needs PyMC, which requires numpy>=2 and so cannot share this environment;
+    # covered by the `estimation-pymc` CI job (tests/test_estimation_pymc.py).
+    estimation/pymc_models.py
 
 [report]
 show_missing = True
@@ -42,6 +45,7 @@ omit =
     */.venv/*
     build/*
     dist/*
+    estimation/pymc_models.py
 
 [xml]
 output = coverage.xml

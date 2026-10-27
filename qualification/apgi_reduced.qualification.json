@@ -1,0 +1,17 @@
+{
+  "checks": {
+    "determinism": true,
+    "fixed_point": true,
+    "independent_reimplementation": true,
+    "ode_generator_parity": true,
+    "product_symmetry": true,
+    "reference_vectors": true,
+    "registry_authority": true,
+    "signal_bounds": true
+  },
+  "decision": "D14",
+  "fixture_sha256": "7bdcef1ba72e9f9bef9b0deb33b621a2b5edc131e1bf40530f5a316e5b8d1b96",
+  "model_id": "apgi_reduced",
+  "qualified": true,
+  "statement": "Only apgi_reduced results carry reference authority."
+}
