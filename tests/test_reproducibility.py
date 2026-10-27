@@ -164,3 +164,163 @@ class TestNoUnseededRandomness:
                 if bare_default_rng.search(code) or legacy_global.search(code):
                     offenders.append(f"{path.relative_to(root)}:{lineno}: {line.strip()}")
         assert not offenders, "unseeded RNG use bypassing core.rng:\n" + "\n".join(offenders)
+
+
+# ---------------------------------------------------------------------------
+# Engine-level reproducibility (S1-IMP-13.3): the reference model, replayable
+# provenance records, checkpoint/resume, and scheduling-independent batches.
+# ---------------------------------------------------------------------------
+
+
+def _stimulus(n: int = 120) -> np.ndarray:
+    return np.sin(0.07 * np.arange(n)) + 0.3 * np.cos(0.31 * np.arange(n))
+
+
+class TestReferenceModelDeterminism:
+    def test_same_seed_bitwise_identical(self):
+        from model_registry import create_model
+
+        a = create_model("apgi_reduced", seed=21).run(_stimulus())
+        b = create_model("apgi_reduced", seed=21).run(_stimulus())
+        for k in a:
+            assert a[k].tobytes() == b[k].tobytes()
+
+    def test_different_seeds_differ(self):
+        from model_registry import create_model
+
+        a = create_model("apgi_reduced", seed=1).run(_stimulus())
+        b = create_model("apgi_reduced", seed=2).run(_stimulus())
+        assert not np.array_equal(a["B"], b["B"])
+
+    def test_no_global_state_leak(self):
+        """Seeding the process-global generator must not change a seeded model run."""
+        from model_registry import create_model
+
+        seed_everything(1)
+        a = create_model("apgi_reduced", seed=5).run(_stimulus())
+        seed_everything(999)
+        np.random.seed(0)
+        b = create_model("apgi_reduced", seed=5).run(_stimulus())
+        assert np.array_equal(a["S"], b["S"]) and np.array_equal(a["B"], b["B"])
+
+
+class TestProvenanceReplay:
+    def test_replay_matches(self):
+        from engine import record_run, replay_run
+
+        x = _stimulus()
+        rec, _ = record_run("apgi_reduced", {"alpha": 0.4}, 8, x)
+        report = replay_run(rec, x)
+        assert report.match and report.inputs_match
+
+    def test_replay_detects_changed_inputs_and_changed_params(self):
+        from dataclasses import replace
+
+        from engine import record_run, replay_run
+
+        x = _stimulus()
+        rec, _ = record_run("apgi_reduced", {}, 8, x)
+        changed_inputs = replay_run(rec, x + 1e-3)
+        assert not changed_inputs.match and not changed_inputs.inputs_match
+        tampered = replace(rec, params={"alpha": 0.9})
+        assert not replay_run(tampered, x).match
+
+    def test_record_roundtrip_through_file(self, tmp_path):
+        from engine import load_record, record_run, replay_run, save_record
+
+        x = _stimulus(50)
+        rec, _ = record_run("apgi_reference", {}, 3, x)
+        loaded = load_record(save_record(rec, tmp_path / "r" / "rec.json"))
+        assert loaded == rec and replay_run(loaded, x).match
+
+    def test_unsupported_record_version_rejected(self, tmp_path):
+        import json
+
+        from engine import load_record
+
+        f = tmp_path / "r.json"
+        f.write_text(json.dumps({"record_version": "99"}))
+        with pytest.raises(ValueError, match="record_version"):
+            load_record(f)
+
+    def test_unseeded_run_cannot_be_replayed_to_a_match(self):
+        from engine import record_run, replay_run
+
+        x = _stimulus()
+        rec, _ = record_run("apgi_reduced", {}, None, x)
+        assert not replay_run(rec, x).match
+
+
+@pytest.mark.parametrize("model_id", ["apgi_reduced", "apgi_null", "apgi_reference", "apgi_liquid"])
+def test_checkpoint_resume_equals_uninterrupted(model_id, tmp_path):
+    """Interrupt at an arbitrary step, resume from disk: identical to a straight run."""
+    from runtime import SessionEngine
+
+    x = _stimulus(90)
+    full = SessionEngine(model_id, seed=13)
+    full.run(x)
+    part = SessionEngine(model_id, seed=13)
+    part.run(x, max_steps=41)
+    path = part.save(tmp_path / "ck.json")
+    resumed = SessionEngine.resume(path)
+    assert resumed.n_done == 41
+    resumed.run(x)
+    assert resumed.output_digest() == full.output_digest()
+
+
+def test_batch_results_independent_of_worker_count(tmp_path):
+    from runtime import make_jobs, run_batch
+
+    jobs = make_jobs(
+        "apgi_reduced",
+        _stimulus(80),
+        n_seeds=3,
+        master_seed=77,
+        params_list=[{}, {"beta": 0.0}, {"alpha": 0.6}],
+    )
+    serial = run_batch(jobs, workers=1)
+    parallel = run_batch(jobs, workers=2)
+    assert serial.digest == parallel.digest
+    assert [r.job_id for r in serial.results] == [j.job_id for j in jobs]
+    again = run_batch(
+        make_jobs(
+            "apgi_reduced",
+            _stimulus(80),
+            n_seeds=3,
+            master_seed=77,
+            params_list=[{}, {"beta": 0.0}, {"alpha": 0.6}],
+        )
+    )
+    assert again.digest == serial.digest
+
+
+def test_batch_seeds_depend_only_on_master_seed_and_index():
+    from runtime import make_jobs
+
+    a = make_jobs("apgi_reduced", [0.0, 1.0], n_seeds=4, master_seed=5)
+    b = make_jobs("apgi_reduced", [0.0, 1.0], n_seeds=4, master_seed=5)
+    c = make_jobs("apgi_reduced", [0.0, 1.0], n_seeds=4, master_seed=6)
+    assert [j.seed for j in a] == [j.seed for j in b]
+    assert [j.seed for j in a] != [j.seed for j in c]
+    assert len({j.seed for j in a}) == 4
+
+
+def test_synthetic_generator_is_seed_reproducible():
+    from estimation import generate_dataset
+    from models.reduced import ReducedParams
+
+    a = generate_dataset(ReducedParams(), rng=3)
+    b = generate_dataset(ReducedParams(), rng=3)
+    for k in ("stimulus", "B", "report", "amplitude"):
+        assert getattr(a, k).tobytes() == getattr(b, k).tobytes()
+
+
+def test_estimation_is_seed_reproducible():
+    from estimation import Observed, fit_laplace, generate_dataset
+    from models.reduced import ReducedParams
+
+    ds = generate_dataset(ReducedParams(), rng=3)
+    data = Observed(ds.stimulus, ds.B, ds.report, ds.amplitude)
+    a = fit_laplace(ReducedParams(), data, rng=1, n_samples=200)
+    b = fit_laplace(ReducedParams(), data, rng=1, n_samples=200)
+    assert a.samples.tobytes() == b.samples.tobytes()

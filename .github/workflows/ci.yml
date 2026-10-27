@@ -39,8 +39,11 @@ jobs:
           pip install -e ".[all]"
 
       - name: Test with branch coverage
+        # Throughput floors are measured by the dedicated `performance` job:
+        # coverage tracing slows pure-Python loops several-fold and would make
+        # them a test of the tracer.
         run: |
-          pytest tests/ \
+          pytest tests/ -m "not performance" \
             --cov --cov-branch \
             --cov-report=term-missing \
             --cov-report=xml \
@@ -138,6 +141,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -151,5 +155,113 @@ jobs:
       - name: Verify determinism
         # The property this repository exists to provide. Guarding it in CI
         # means a future RNG regression fails the build rather than quietly
-        # invalidating published figures.
-        run: pytest tests/test_reproducibility.py -v
+        # invalidating published figures. The second file adds the cross-process
+        # check under different PYTHONHASHSEED values (gate: seeded repeatability).
+        run: pytest tests/test_reproducibility.py tests/test_ci_gates.py -m "conformance or repeatability" -v
+
+  # --- Gates for apgi-implementation (XC-CI-02) -----------------------------
+  # Each is a separately named job so branch protection can require it
+  # individually: numerical-parity, stability, performance, reproducibility
+  # (seeded repeatability), k7c-recovery-smoke. See docs/CI-GATES.md.
+
+  numerical-parity:
+    name: numerical parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[all]"
+      - name: Independent implementations agree
+        run: pytest tests/ -m parity -v
+
+  stability:
+    name: stability
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[all]"
+      - name: Bounded and finite at extremes
+        run: pytest tests/ -m stability -v
+
+  performance:
+    name: performance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[all]"
+      - name: Throughput floors
+        # No --cov: tracing would distort the measurement.
+        run: pytest tests/ -m performance -v -p no:cacheprovider
+
+  k7c-recovery-smoke:
+    name: K7c recovery smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[all]"
+      - name: Small recovery simulation
+        run: pytest tests/ -m recovery_smoke -v
+
+  dependency-policy:
+    name: dependency policy and qualification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[all]"
+      - name: Acyclic graph, pinned packages, no copied models, deprecations listed
+        run: python tools/check_dependencies.py
+      - name: apgi_reduced qualification record is current
+        run: python -m qualification.reference
+
+  estimation-pymc:
+    name: PyMC model matches the numpy reference
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install PyMC in its own environment
+        # PyMC/PyTensor releases require numpy>=2, which pyproject.toml caps below
+        # for the published figures, so this job does not `pip install -e .`; the
+        # modules under test import only numpy/scipy/pymc and run from the source tree.
+        run: |
+          python -m pip install --upgrade pip
+          pip install pymc scipy pytest structlog pydantic
+      - name: logp parity and a short NUTS run
+        run: PYTHONPATH=. pytest tests/test_estimation_pymc.py -v -p no:cacheprovider -o addopts="" -W ignore

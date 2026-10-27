@@ -45,14 +45,22 @@ dependencies = [
 ]
 [project.optional-dependencies]
 sci = [
-    "scipy>=1.10.0",
+    "scipy>=1.10.0,<2.0",
 ]
 reservoir = [
-    "scipy>=1.10.0",
+    "scipy>=1.10.0,<2.0",
 ]
 analysis = [
-    "scipy>=1.10.0",
-    "matplotlib>=3.7.0",
+    "scipy>=1.10.0,<2.0",
+    "matplotlib>=3.7.0,<4.0",
+]
+# Optional NUTS estimation (estimation/pymc_models.py). The numpy estimators in
+# estimation/fitting.py need only scipy. Recent PyMC/PyTensor releases require
+# numpy>=2, which this package caps below; install this extra into an
+# environment where that resolves (see DEPENDENCY-MATRIX.md).
+estimation = [
+    "scipy>=1.10.0,<2.0",
+    "pymc>=5.10.0,<7.0",
 ]
 dev = [
     "pytest>=7.0.0,<9.0",
@@ -100,6 +108,13 @@ include = [
     "analysis*",
     "energy*",
     "active_inference*",
+    "models*",
+    "engine*",
+    "estimation*",
+    "adapters*",
+    "runtime*",
+    "model_registry*",
+    "qualification*",
 ]
 
 # pipeline.py, config.py and main.py are top-level MODULES, not packages, so
@@ -161,7 +176,7 @@ exclude = ["tests/", "examples/", "build/", "dist/", "delete_pycache.py"]
 # loading. Both are imported inside try/except, so their absence is a supported
 # configuration rather than a type error.
 [[tool.mypy.overrides]]
-module = ["tomli", "mne", "mne.*"]
+module = ["tomli", "mne", "mne.*", "pymc", "pymc.*", "pytensor", "pytensor.*", "arviz", "arviz.*"]
 ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
