@@ -1,0 +1,48 @@
+{
+  "apgi_version": "1.1.0",
+  "config": {
+    "args": {
+      "draws": 3000,
+      "estimator": "mcmc",
+      "out": "gates",
+      "points": 100,
+      "seed": 20261116,
+      "starts": 16,
+      "subjects": 60,
+      "warmup": 1500
+    },
+    "model": "apgi_reduced",
+    "seed": 20261116,
+    "tool": "run_k7"
+  },
+  "config_sha256": "513903a7329214a91e0ed8c48b2a921a74102523c208a649a1d021f698c9d718",
+  "dependencies": {
+    "matplotlib": "3.11.2",
+    "numpy": "1.26.4",
+    "pydantic": "2.13.5",
+    "scipy": "1.17.1",
+    "structlog": "25.5.0"
+  },
+  "elapsed_s": 1222.6,
+  "generated_utc": "2026-10-27T19:43:57.653239+00:00",
+  "git": {
+    "branch": "claude/awesome-hypatia-2q329f",
+    "commit": "1ebabaa11b39cc531f1a20f5ea85ed72275133a5",
+    "dirty": true
+  },
+  "k7a_sha256": "9b5dc8c02032b803720ec7c8141ad639cfaf7deb81b6c2d78b58e51a7b9892e3",
+  "k7c_sha256": "03a18b99eb31f5d02a771009f16a9b322bcca85430c894817729f98b71f68fb7",
+  "platform": {
+    "machine": "x86_64",
+    "release": "6.18.44-fc-v165",
+    "system": "Linux"
+  },
+  "python": {
+    "implementation": "CPython",
+    "version": "3.13.17"
+  },
+  "seed": 20261116,
+  "spec_conformant": true,
+  "strict": null,
+  "validation_warnings": []
+}

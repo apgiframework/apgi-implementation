@@ -1,0 +1,100 @@
+{
+  "schema_version": "1",
+  "design": {
+    "channels": [
+      "behavior",
+      "ignition",
+      "amplitude"
+    ],
+    "n_subjects": 60,
+    "estimator": "mcmc"
+  },
+  "k7b_note": "K7b is empirical and cannot be resolved by desk science; exposable reflects K7a and K7c only and is provisional until K7b reports.",
+  "criteria": {
+    "recovery_r_min": 0.7,
+    "pairwise_abs_posterior_corr_max": 0.6,
+    "coverage95_range": [
+      0.9,
+      0.98
+    ]
+  },
+  "meta": {
+    "seed": 20261116,
+    "k7a_sha256": "9b5dc8c02032b803720ec7c8141ad639cfaf7deb81b6c2d78b58e51a7b9892e3",
+    "k7c_sha256": "03a18b99eb31f5d02a771009f16a9b322bcca85430c894817729f98b71f68fb7",
+    "git_commit": "1ebabaa11b39cc531f1a20f5ea85ed72275133a5",
+    "model": "apgi_reduced",
+    "contract_status": "provisional: S1-REG-04 mathematical-contracts.yaml not yet qualified"
+  },
+  "parameters": [
+    {
+      "parameter": "alpha",
+      "symbol": "\u03b1",
+      "k7a": "FALSIFIED",
+      "k7b": "PENDING_DATA",
+      "k7c": "FALSIFIED",
+      "exposable": false,
+      "reason": "K7a FALSIFIED; K7c FALSIFIED (pairwise |r|=0.91)",
+      "recovery_r": 0.8847,
+      "coverage95": 0.95,
+      "nrmse": 0.1369,
+      "bias": -0.01795
+    },
+    {
+      "parameter": "pi",
+      "symbol": "\u03a0",
+      "k7a": "FALSIFIED",
+      "k7b": "PENDING_DATA",
+      "k7c": "FALSIFIED",
+      "exposable": false,
+      "reason": "K7a FALSIFIED; K7c FALSIFIED (pairwise |r|=0.93)",
+      "recovery_r": 0.9172,
+      "coverage95": 0.9333,
+      "nrmse": 0.1122,
+      "bias": 0.08759
+    },
+    {
+      "parameter": "theta_base",
+      "symbol": "\u03b8\u2080",
+      "k7a": "CONFIRMED",
+      "k7b": "PENDING_DATA",
+      "k7c": "CONFIRMED",
+      "exposable": true,
+      "reason": "structurally identifiable and recoverable",
+      "recovery_r": 0.8982,
+      "coverage95": 0.9167,
+      "nrmse": 0.1327,
+      "bias": 0.02191
+    },
+    {
+      "parameter": "beta",
+      "symbol": "\u03b2_DA",
+      "k7a": "CONFIRMED",
+      "k7b": "PENDING_DATA",
+      "k7c": "FALSIFIED",
+      "exposable": false,
+      "reason": "K7c FALSIFIED (pairwise |r|=0.93)",
+      "recovery_r": 0.9441,
+      "coverage95": 0.9667,
+      "nrmse": 0.1046,
+      "bias": -0.01017
+    },
+    {
+      "parameter": "precision_weighted_learning_composite",
+      "symbol": "\u03b1\u03a0",
+      "k7a": "CONFIRMED",
+      "k7b": "PENDING_DATA",
+      "k7c": "CONFIRMED",
+      "exposable": true,
+      "reason": "structurally identifiable and recoverable",
+      "recovery_r": 0.9975,
+      "coverage95": 0.9667,
+      "nrmse": 0.0147,
+      "bias": 0.00081
+    }
+  ],
+  "allow_list": [
+    "theta_base",
+    "precision_weighted_learning_composite"
+  ]
+}

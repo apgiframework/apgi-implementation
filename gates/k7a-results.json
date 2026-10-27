@@ -1,0 +1,329 @@
+{
+  "behavior": {
+    "channels": [
+      "behavior"
+    ],
+    "product_symmetry_gap": {
+      "behavior_only": 0.0,
+      "this_channel_set": 0.0
+    },
+    "sweep": {
+      "channels": [
+        "behavior"
+      ],
+      "n_points": 100,
+      "full_rank_fraction": 0.0,
+      "identifiable_fraction": {
+        "alpha": 0.01,
+        "pi": 0.05,
+        "theta_base": 0.0,
+        "beta": 0.0
+      },
+      "median_condition": Infinity,
+      "p95_condition": Infinity,
+      "ill_conditioned_fraction": 1.0,
+      "median_min_singular_value": 0.0,
+      "rank_counts": {
+        "1": 100
+      }
+    },
+    "suspect_pairs": {
+      "alpha-pi": {
+        "pair": [
+          "alpha",
+          "pi"
+        ],
+        "median_partial_collinearity": 1.0,
+        "p95_partial_collinearity": 1.0,
+        "degenerate_fraction": 1.0,
+        "classification": "degenerate"
+      },
+      "theta_base-beta": {
+        "pair": [
+          "theta_base",
+          "beta"
+        ],
+        "median_partial_collinearity": 1.0,
+        "p95_partial_collinearity": 1.0,
+        "degenerate_fraction": 1.0,
+        "classification": "degenerate"
+      }
+    },
+    "equivalent_solutions": {
+      "channels": [
+        "behavior"
+      ],
+      "weakest_direction": {
+        "singular_value": 0.0,
+        "vector": {
+          "alpha": 0.0,
+          "pi": 0.0,
+          "theta_base": 1.0,
+          "beta": 0.0
+        },
+        "n_active_gt_0.3": 1
+      },
+      "n_starts": 16,
+      "n_equivalent_solutions": 16,
+      "equivalent_solutions": [
+        [
+          0.20019332811034868,
+          2.247827159114689,
+          0.3944985044396888,
+          -0.06393765742879093
+        ],
+        [
+          0.425160611216121,
+          1.0584235419006216,
+          0.7585491601537436,
+          -0.1502823153093516
+        ],
+        [
+          0.18489422973140118,
+          2.4338239254611795,
+          0.3325746643311074,
+          -0.22707319211989338
+        ],
+        [
+          0.11355137203030025,
+          3.962964004344405,
+          0.7786653381495636,
+          0.2761159160741358
+        ],
+        [
+          0.25927047389317637,
+          1.73563920813215,
+          0.29539915152347984,
+          0.13246528786037892
+        ]
+      ],
+      "null_vectors": [
+        {
+          "active": [
+            "alpha",
+            "pi"
+          ],
+          "vector": [
+            0.7417226863423919,
+            -0.6707066844493393,
+            -0.0,
+            -0.0
+          ]
+        },
+        {
+          "active": [
+            "beta"
+          ],
+          "vector": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "active": [
+            "theta_base"
+          ],
+          "vector": [
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "subset_trade_off": false,
+      "pair_trade_off": true
+    },
+    "classification": {
+      "alpha": "FALSIFIED",
+      "pi": "FALSIFIED",
+      "theta_base": "FALSIFIED",
+      "beta": "FALSIFIED"
+    },
+    "composite": {
+      "composite": "precision_weighted_learning_composite",
+      "identifiable_fraction": 1.0,
+      "max_null_leak": 3.3906347923978086e-10,
+      "status": "CONFIRMED"
+    }
+  },
+  "behavior+ignition": {
+    "channels": [
+      "behavior",
+      "ignition"
+    ],
+    "product_symmetry_gap": {
+      "behavior_only": 0.0,
+      "this_channel_set": 0.14171583272476052
+    },
+    "sweep": {
+      "channels": [
+        "behavior",
+        "ignition"
+      ],
+      "n_points": 100,
+      "full_rank_fraction": 1.0,
+      "identifiable_fraction": {
+        "alpha": 1.0,
+        "pi": 1.0,
+        "theta_base": 1.0,
+        "beta": 1.0
+      },
+      "median_condition": 303.1774020906664,
+      "p95_condition": 992.7419065889787,
+      "ill_conditioned_fraction": 0.05,
+      "median_min_singular_value": 0.36348364434818065,
+      "rank_counts": {
+        "4": 100
+      }
+    },
+    "suspect_pairs": {
+      "alpha-pi": {
+        "pair": [
+          "alpha",
+          "pi"
+        ],
+        "median_partial_collinearity": 0.9999032864399353,
+        "p95_partial_collinearity": 0.9999565035455011,
+        "degenerate_fraction": 1.0,
+        "classification": "degenerate"
+      },
+      "theta_base-beta": {
+        "pair": [
+          "theta_base",
+          "beta"
+        ],
+        "median_partial_collinearity": 0.511831851401827,
+        "p95_partial_collinearity": 0.7302167360951599,
+        "degenerate_fraction": 0.0,
+        "classification": "identifiable"
+      }
+    },
+    "equivalent_solutions": {
+      "channels": [
+        "behavior",
+        "ignition"
+      ],
+      "weakest_direction": {
+        "singular_value": 0.5513094634904753,
+        "vector": {
+          "alpha": -0.5100524321628838,
+          "pi": 0.4611267256112289,
+          "theta_base": -0.044273987420888034,
+          "beta": -0.7247402799690715
+        },
+        "n_active_gt_0.3": 3
+      },
+      "n_starts": 16,
+      "n_equivalent_solutions": 0,
+      "equivalent_solutions": [],
+      "null_vectors": [],
+      "subset_trade_off": false,
+      "pair_trade_off": false
+    },
+    "classification": {
+      "alpha": "FALSIFIED",
+      "pi": "FALSIFIED",
+      "theta_base": "CONFIRMED",
+      "beta": "CONFIRMED"
+    },
+    "composite": {
+      "composite": "precision_weighted_learning_composite",
+      "identifiable_fraction": 1.0,
+      "max_null_leak": 0.0,
+      "status": "CONFIRMED"
+    }
+  },
+  "behavior+ignition+amplitude": {
+    "channels": [
+      "behavior",
+      "ignition",
+      "amplitude"
+    ],
+    "product_symmetry_gap": {
+      "behavior_only": 0.0,
+      "this_channel_set": 1.541015715977875
+    },
+    "sweep": {
+      "channels": [
+        "behavior",
+        "ignition",
+        "amplitude"
+      ],
+      "n_points": 100,
+      "full_rank_fraction": 1.0,
+      "identifiable_fraction": {
+        "alpha": 1.0,
+        "pi": 1.0,
+        "theta_base": 1.0,
+        "beta": 1.0
+      },
+      "median_condition": 28.309950383792852,
+      "p95_condition": 83.644090615417,
+      "ill_conditioned_fraction": 0.0,
+      "median_min_singular_value": 4.893279890690733,
+      "rank_counts": {
+        "4": 100
+      }
+    },
+    "suspect_pairs": {
+      "alpha-pi": {
+        "pair": [
+          "alpha",
+          "pi"
+        ],
+        "median_partial_collinearity": 0.9840537727310632,
+        "p95_partial_collinearity": 0.9926158587587932,
+        "degenerate_fraction": 0.22,
+        "classification": "degenerate"
+      },
+      "theta_base-beta": {
+        "pair": [
+          "theta_base",
+          "beta"
+        ],
+        "median_partial_collinearity": 0.018493817209251633,
+        "p95_partial_collinearity": 0.03345854058385513,
+        "degenerate_fraction": 0.0,
+        "classification": "identifiable"
+      }
+    },
+    "equivalent_solutions": {
+      "channels": [
+        "behavior",
+        "ignition",
+        "amplitude"
+      ],
+      "weakest_direction": {
+        "singular_value": 6.59010021977851,
+        "vector": {
+          "alpha": -0.03752604605230952,
+          "pi": 0.03305032919647298,
+          "theta_base": -0.9969596774724317,
+          "beta": -0.05975678289323751
+        },
+        "n_active_gt_0.3": 1
+      },
+      "n_starts": 16,
+      "n_equivalent_solutions": 0,
+      "equivalent_solutions": [],
+      "null_vectors": [],
+      "subset_trade_off": false,
+      "pair_trade_off": false
+    },
+    "classification": {
+      "alpha": "FALSIFIED",
+      "pi": "FALSIFIED",
+      "theta_base": "CONFIRMED",
+      "beta": "CONFIRMED"
+    },
+    "composite": {
+      "composite": "precision_weighted_learning_composite",
+      "identifiable_fraction": 1.0,
+      "max_null_leak": 0.0,
+      "status": "CONFIRMED"
+    }
+  }
+}
