@@ -145,7 +145,17 @@ def replay_run(
 
     A mismatch in the *input* digest is reported separately so a failed replay
     can be attributed to the data rather than the model.
+
+    Raises:
+        ValueError: If ``record.model_version`` differs from the registered version.
     """
+    variant = get_variant(record.model_id)
+    if record.model_version != variant.version:
+        # AUD-DEF-05: replay under different dynamics is not a replay.
+        raise ValueError(
+            f"record was produced by {record.model_id} {record.model_version}; this build "
+            f"provides {variant.version} and no approved migration exists"
+        )
     inputs_match = array_digest(_input_arrays(x_e, x_i)) == record.input_digest
     outputs = create_model(record.model_id, record.params, record.seed).run(x_e, x_i)
     actual = array_digest(outputs)

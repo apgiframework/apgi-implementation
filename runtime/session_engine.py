@@ -16,13 +16,19 @@ import numpy as np
 
 from adapters.canonical_inputs import CanonicalInputs, to_canonical_inputs
 from adapters.canonical_outputs import CanonicalOutputs, to_canonical_outputs
+from core.finite import require_finite_array, require_finite_scalar, require_optional_finite_scalar
 from engine.provenance import array_digest
 from model_registry.variants import create_model, get_variant
 from models.base import RUN_KEYS, APGIModel
 
-from .checkpoint import Checkpoint, load_checkpoint, save_checkpoint
+from .checkpoint import CHECKPOINT_VERSION, Checkpoint, load_checkpoint, save_checkpoint
 
-__all__ = ["SessionEngine", "ReplayMismatchError", "InputMismatchError"]
+__all__ = [
+    "SessionEngine",
+    "ReplayMismatchError",
+    "InputMismatchError",
+    "IncompatibleCheckpointError",
+]
 
 
 class ReplayMismatchError(RuntimeError):
@@ -31,6 +37,57 @@ class ReplayMismatchError(RuntimeError):
 
 class InputMismatchError(ValueError):
     """The inputs supplied on resume differ from those the checkpoint consumed."""
+
+
+class IncompatibleCheckpointError(ValueError):
+    """The checkpoint was produced by a model/software version this build cannot resume.
+
+    No migration between model versions is approved, so any mismatch is refused
+    rather than silently continuing under different dynamics (AUD-DEF-05).
+    """
+
+
+def _check_checkpoint_compatible(ck: Checkpoint) -> None:
+    """Refuse a checkpoint whose identity or internal consistency is wrong."""
+    variant = get_variant(ck.model_id)
+    if ck.model_version != variant.version:
+        raise IncompatibleCheckpointError(
+            f"checkpoint was produced by {ck.model_id} {ck.model_version}; this build "
+            f"provides {variant.version} and no approved migration exists"
+        )
+    producer = ck.extra.get("producer")
+    if producer is not None:
+        current = producer_identity()
+        for key in ("package_version", "checkpoint_format"):
+            if producer.get(key) != current.get(key):
+                raise IncompatibleCheckpointError(
+                    f"checkpoint {key}={producer.get(key)!r} does not match this "
+                    f"build's {current.get(key)!r}"
+                )
+    n = ck.n_done
+    if n < 0 or len(ck.x_e) != n:
+        raise IncompatibleCheckpointError(f"n_done={n} but {len(ck.x_e)} consumed inputs stored")
+    if ck.x_i is not None and len(ck.x_i) != n:
+        raise IncompatibleCheckpointError(f"x_i holds {len(ck.x_i)} values for n_done={n}")
+    if set(ck.history) != set(RUN_KEYS) or any(len(v) != n for v in ck.history.values()):
+        raise IncompatibleCheckpointError("history keys/lengths inconsistent with n_done")
+    try:
+        require_finite_array("checkpoint x_e", ck.x_e)
+        if ck.x_i is not None:
+            require_finite_array("checkpoint x_i", ck.x_i)
+    except ValueError as exc:
+        raise IncompatibleCheckpointError(str(exc)) from exc
+
+
+def producer_identity() -> dict[str, Any]:
+    """Software identity stamped into checkpoints and compared on resume."""
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        pkg = version("apgi")
+    except PackageNotFoundError:
+        pkg = None
+    return {"package_version": pkg, "checkpoint_format": CHECKPOINT_VERSION}
 
 
 class SessionEngine:
@@ -43,6 +100,7 @@ class SessionEngine:
         checkpoint_path: If set together with ``checkpoint_every``, a checkpoint
             is written every that-many steps during :meth:`run`.
         checkpoint_every: Steps between automatic checkpoints.
+        protocol_version: Protocol version recorded on the canonical outputs.
     """
 
     def __init__(
@@ -53,6 +111,7 @@ class SessionEngine:
         *,
         checkpoint_path: str | Path | None = None,
         checkpoint_every: int | None = None,
+        protocol_version: str | None = None,
     ):
         if checkpoint_every is not None and checkpoint_every < 1:
             raise ValueError("checkpoint_every must be >= 1")
@@ -60,6 +119,7 @@ class SessionEngine:
             raise ValueError("checkpoint_every requires checkpoint_path")
         self.model_id = model_id
         self.seed = seed
+        self.protocol_version = protocol_version
         self._params = dict(params or {})
         self.model: APGIModel = create_model(model_id, self._params, seed)
         self.checkpoint_path = None if checkpoint_path is None else Path(checkpoint_path)
@@ -74,7 +134,14 @@ class SessionEngine:
         return len(self._x_e)
 
     def advance(self, x_e: float, x_i: float | None = None) -> dict[str, float]:
-        """Process one step and record it."""
+        """Process one step and record it.
+
+        Inputs are validated before anything changes: a rejected call leaves the
+        model state, RNG, consumed inputs and history exactly as they were
+        (AUD-DEF-01).
+        """
+        x_e = require_finite_scalar("x_e", x_e)
+        x_i = require_optional_finite_scalar("x_i", x_i)
         if x_i is not None:
             if self._x_i is None:
                 if self._x_e:
@@ -136,6 +203,7 @@ class SessionEngine:
             {k: np.asarray(v) for k, v in self._hist.items()},
             model_id=self.model_id,
             model_version=get_variant(self.model_id).version,
+            protocol_version=self.protocol_version,
         )
 
     def output_digest(self) -> str:
@@ -154,7 +222,10 @@ class SessionEngine:
             x_i=None if self._x_i is None else list(self._x_i),
             history={k: list(v) for k, v in self._hist.items()},
             state=self.model.get_state(),
-            extra={"output_digest": self.output_digest() if self._x_e else None},
+            extra={
+                "output_digest": self.output_digest() if self._x_e else None,
+                "producer": producer_identity(),
+            },
         )
 
     def save(self, path: str | Path) -> Path:
@@ -168,14 +239,27 @@ class SessionEngine:
         Raises:
             ReplayMismatchError: If a replay-restored model does not regenerate the
                 stored outputs (the model is not deterministic under its seed).
+            IncompatibleCheckpointError: If the checkpoint's model version or
+                producer identity differs from this build, or its stored inputs,
+                history and step count are inconsistent.
         """
         ck = load_checkpoint(source) if isinstance(source, (str, os.PathLike)) else source
+        _check_checkpoint_compatible(ck)
         engine = cls(ck.model_id, ck.params, ck.seed, **kwargs)
         if ck.state is not None:
+            expected = ck.extra.get("output_digest")
+            hist = {k: list(v) for k, v in ck.history.items()}
+            if (
+                expected is not None
+                and array_digest({k: np.asarray(v) for k, v in hist.items()}) != expected
+            ):
+                raise IncompatibleCheckpointError(
+                    "stored history does not match the checkpoint's output digest"
+                )
             engine.model.set_state(ck.state)
             engine._x_e = list(ck.x_e)
             engine._x_i = None if ck.x_i is None else list(ck.x_i)
-            engine._hist = {k: list(v) for k, v in ck.history.items()}
+            engine._hist = hist
         else:
             for t in range(ck.n_done):
                 engine.advance(ck.x_e[t], None if ck.x_i is None else ck.x_i[t])

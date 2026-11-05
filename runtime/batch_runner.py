@@ -6,10 +6,22 @@ on how the work was scheduled. Seeds come from ``SeedSequence(master).spawn`` by
 ``workers=8`` give bit-identical results. With an ``output_dir`` each finished
 job is written to its own file and skipped on re-run (``resume=True``), which
 makes an interrupted batch restartable.
+
+Cache integrity (AUD-DEF-06). A cached file is reused only when
+
+* its ``cache_identity`` — job spec hash *plus* model version, package version,
+  implementation commit and environment-lock digest — equals the current one;
+* its ``sha256`` matches the canonical JSON of the stored document; and
+* the summary statistics recomputed from the stored output arrays, and the
+  output digest over them, equal the stored summary.
+
+Anything else is an explicit invalidation: the job is re-run and the reason is
+recorded in :attr:`BatchResult.invalidated`, never silently substituted.
 """
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 from collections.abc import Mapping, Sequence
@@ -25,7 +37,50 @@ from engine.provenance import array_digest
 
 from .session_engine import SessionEngine
 
-__all__ = ["BatchJob", "JobResult", "BatchResult", "make_jobs", "run_job", "run_batch"]
+__all__ = [
+    "CACHE_FORMAT",
+    "BatchJob",
+    "JobResult",
+    "BatchResult",
+    "cache_identity",
+    "make_jobs",
+    "run_job",
+    "run_batch",
+]
+
+CACHE_FORMAT = "2"
+
+
+@functools.lru_cache(maxsize=1)
+def _producer() -> dict[str, Any]:
+    """Identity of the producing build (cached: it cannot change mid-process)."""
+    from core.manifest import git_revision
+
+    from .run_manifest import environment_lock
+    from .session_engine import producer_identity
+
+    git = git_revision()
+    return {
+        **producer_identity(),
+        "implementation_commit": git["commit"],
+        "env_lock": environment_lock()["sha256"],
+    }
+
+
+def cache_identity(job: BatchJob) -> str:
+    """Digest binding a cached result to the job *and* the code that produced it."""
+    from model_registry.variants import get_variant
+
+    blob = json.dumps(
+        {
+            "cache_format": CACHE_FORMAT,
+            "spec_hash": job.spec_hash(),
+            "model_version": get_variant(job.model_id).version,
+            "producer": _producer(),
+        },
+        sort_keys=True,
+    )
+    return hashlib.sha256(blob.encode()).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -85,6 +140,8 @@ class BatchResult:
     """All job results in job order, plus a digest over them."""
 
     results: list[JobResult]
+    #: ``{job_id: reason}`` for cached files that were found but rejected.
+    invalidated: dict[str, str] = field(default_factory=dict)
 
     @property
     def digest(self) -> str:
@@ -128,43 +185,75 @@ def make_jobs(
     return jobs
 
 
-def run_job(job: BatchJob, keep_outputs: bool = False) -> JobResult:
-    """Execute one job (top-level so it pickles for process pools)."""
-    engine = SessionEngine(job.model_id, job.params, job.seed)
-    out = engine.run({"x_e": job.x_e, "x_i": job.x_i} if job.x_i is not None else job.x_e)
-    s = out.series
+def _summarise(job: BatchJob, series: Mapping[str, np.ndarray], keep: bool) -> JobResult:
+    s = {k: np.asarray(v, dtype=float) for k, v in series.items()}
     return JobResult(
         job_id=job.job_id,
         spec_hash=job.spec_hash(),
         output_digest=array_digest(s),
-        n_steps=out.n_steps,
+        n_steps=int(s["B"].shape[0]),
         ignition_rate=float(s["B"].mean()),
         mean_S=float(s["S"].mean()),
         mean_theta=float(s["theta"].mean()),
-        outputs={k: v.tolist() for k, v in s.items()} if keep_outputs else None,
+        outputs={k: v.tolist() for k, v in s.items()} if keep else None,
     )
 
 
-def _load_cached(path: Path, job: BatchJob) -> JobResult | None:
+def run_job(job: BatchJob, keep_outputs: bool = False) -> JobResult:
+    """Execute one job (top-level so it pickles for process pools)."""
+    engine = SessionEngine(job.model_id, job.params, job.seed)
+    out = engine.run({"x_e": job.x_e, "x_i": job.x_i} if job.x_i is not None else job.x_e)
+    return _summarise(job, out.series, keep_outputs)
+
+
+def _doc_digest(body: Mapping[str, Any]) -> str:
+    blob = json.dumps(body, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    return hashlib.sha256(blob.encode()).hexdigest()
+
+
+def _write_cached(path: Path, job: BatchJob, res: JobResult, series: Mapping[str, Any]) -> None:
+    body = {
+        "cache_format": CACHE_FORMAT,
+        "cache_identity": cache_identity(job),
+        "summary": res.summary(),
+        "outputs": {k: [float(v) for v in vals] for k, vals in series.items()},
+    }
+    doc = {"sha256": _doc_digest(body), "body": body}
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(doc, sort_keys=True) + "\n", encoding="utf-8")
+    tmp.replace(path)
+
+
+def _load_cached(path: Path, job: BatchJob) -> tuple[JobResult | None, str | None]:
+    """Return ``(result, None)`` for a verified cache hit, else ``(None, reason)``.
+
+    ``reason`` is ``None`` when no cache file exists (a plain miss).
+    """
+    if not path.exists():
+        return None, None
     try:
         doc = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    if doc.get("spec_hash") != job.spec_hash():
-        return None
-    keys = (
-        "job_id",
-        "spec_hash",
-        "output_digest",
-        "n_steps",
-        "ignition_rate",
-        "mean_S",
-        "mean_theta",
-    )
+        body = doc["body"]
+        stored_sha = doc["sha256"]
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        return None, f"unreadable cache ({exc.__class__.__name__})"
     try:
-        return JobResult(**{k: doc[k] for k in keys}, from_cache=True)
-    except KeyError:
-        return None
+        if _doc_digest(body) != stored_sha:
+            return None, "cache document digest mismatch (modified or truncated)"
+    except ValueError:
+        return None, "cache document contains non-finite values"
+    if body.get("cache_format") != CACHE_FORMAT:
+        return None, f"unsupported cache format {body.get('cache_format')!r}"
+    if body.get("cache_identity") != cache_identity(job):
+        return None, "stale cache: job spec, model, software or environment changed"
+    try:
+        recomputed = _summarise(job, body["outputs"], keep=False)
+    except (KeyError, TypeError, ValueError, IndexError) as exc:
+        return None, f"cached outputs unusable ({exc.__class__.__name__})"
+    if recomputed.summary() != body.get("summary"):
+        return None, "cached summary does not match its stored outputs"
+    recomputed.from_cache = True
+    return recomputed, None
 
 
 def run_batch(
@@ -181,7 +270,8 @@ def run_batch(
         jobs: Jobs to run; ``job_id`` values must be unique.
         workers: Process count (1 runs in-process).
         output_dir: If set, write ``<job_id>.json`` per finished job.
-        resume: Reuse a stored result when its ``spec_hash`` matches the job.
+        resume: Reuse a stored result only after full verification (see module
+            docstring); rejected files are re-run and listed in ``invalidated``.
         keep_outputs: Retain full output arrays in the results (memory-heavy).
 
     Raises:
@@ -197,23 +287,32 @@ def run_batch(
         out_dir.mkdir(parents=True, exist_ok=True)
 
     results: dict[str, JobResult] = {}
+    invalidated: dict[str, str] = {}
     todo: list[BatchJob] = []
     for job in jobs:
-        cached = _load_cached(out_dir / f"{job.job_id}.json", job) if (out_dir and resume) else None
+        cached = None
+        if out_dir is not None and resume:
+            cached, reason = _load_cached(out_dir / f"{job.job_id}.json", job)
+            if reason is not None:
+                invalidated[job.job_id] = reason
         if cached is not None and not keep_outputs:
             results[job.job_id] = cached
         else:
             todo.append(job)
 
+    # Outputs are always retained internally so the cache can store them; they
+    # are dropped from the returned results unless ``keep_outputs``.
+    need = out_dir is not None or keep_outputs
     if workers == 1 or len(todo) <= 1:
-        fresh = [run_job(j, keep_outputs) for j in todo]
+        fresh = [run_job(j, need) for j in todo]
     else:
         with ProcessPoolExecutor(max_workers=workers) as pool:
-            fresh = list(pool.map(run_job, todo, [keep_outputs] * len(todo)))
+            fresh = list(pool.map(run_job, todo, [need] * len(todo)))
+    by_id = {j.job_id: j for j in todo}
     for res in fresh:
+        if out_dir is not None and res.outputs is not None:
+            _write_cached(out_dir / f"{res.job_id}.json", by_id[res.job_id], res, res.outputs)
+        if not keep_outputs:
+            res.outputs = None
         results[res.job_id] = res
-        if out_dir is not None:
-            (out_dir / f"{res.job_id}.json").write_text(
-                json.dumps(res.summary(), sort_keys=True) + "\n", encoding="utf-8"
-            )
-    return BatchResult([results[i] for i in ids])
+    return BatchResult([results[i] for i in ids], invalidated)

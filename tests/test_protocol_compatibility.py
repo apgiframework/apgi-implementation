@@ -26,6 +26,7 @@ from adapters import (
     to_canonical_outputs,
 )
 from adapters import version_adapter as va
+from adapters.canonical_outputs import OUTPUT_SCHEMA_VERSION
 from config import CONFIG
 from model_registry import create_model
 from pipeline import APGIPipeline
@@ -118,7 +119,7 @@ class TestCanonicalOutputs:
         assert out.n_steps == 30
         assert {"S", "theta", "B", "p_ignite"} <= set(out.series)
         assert len(out.to_records()) == 30
-        assert json.loads(out.to_json())["schema_version"] == "1"
+        assert json.loads(out.to_json())["schema_version"] == OUTPUT_SCHEMA_VERSION
 
     def test_aliases_and_units(self):
         run = self._run()
@@ -252,7 +253,12 @@ class TestRunManifest:
         m = _manifest()
         assert set(REQUIRED_FIELDS) <= set(m)
         assert validate_run_manifest(m) == []
-        assert m["protocol"] == {"id": "P-001", "version": "1.0", "hash": "ab" * 32}
+        assert m["protocol"] == {
+            "id": "P-001",
+            "version": "1.0",
+            "hash": "ab" * 32,
+            "lock": None,
+        }
         assert m["env_lock"]["sha256"] and m["run_id"].startswith("run-")
 
     def test_not_reproducible_until_sources_accessible(self, tmp_path):

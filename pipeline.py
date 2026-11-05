@@ -10,6 +10,7 @@ import numpy as np
 from active_inference.policy import ActiveInferenceAgent
 from core.allostatic import allostatic_threshold_ode
 from core.dynamics import compute_precision_coupled_noise_std, update_prediction, update_signal_ode
+from core.finite import require_finite_scalar, require_optional_finite_scalar
 from core.ignition import compute_ignition_probability, detect_ignition_event, sample_ignition_state
 from core.logging_config import get_logger
 from core.manifest import build_manifest, write_manifest
@@ -644,6 +645,12 @@ class APGIPipeline:
         x_hat_e: float | None = None,
         x_hat_i: float | None = None,
     ) -> dict:
+        # AUD-DEF-01 / APGI-PRO-002: reject malformed inputs before ANY state,
+        # statistics, RNG or history mutation, so a rejected call is atomic.
+        x_e = require_finite_scalar("x_e", x_e)
+        x_i = require_finite_scalar("x_i", x_i)
+        x_hat_e = require_optional_finite_scalar("x_hat_e", x_hat_e)
+        x_hat_i = require_optional_finite_scalar("x_hat_i", x_hat_i)
         # Use provided predictions or internalized ones per §1.4
         _x_hat_e = x_hat_e if x_hat_e is not None else self.x_hat_e
         _x_hat_i = x_hat_i if x_hat_i is not None else self.x_hat_i
@@ -1462,7 +1469,14 @@ class APGIPipeline:
         return result
 
     def validate(self) -> dict:
-        """Perform statistical validation on the accumulated history."""
+        """Perform statistical validation on the accumulated history.
+
+        Returns:
+            A dict whose ``status`` is ``"insufficient_data"``, ``"success"``
+            (every analysis ran) or ``"partial"`` (one or more sub-analyses
+            raised; they are listed in ``failed_analyses`` and ``certifiable``
+            is False). Exceptions in the core Hurst/PSD analyses propagate.
+        """
         if len(self.history["theta"]) < 64:
             return {"status": "insufficient_data"}
         # Validate threshold 1/f / fractal dynamics (§12/§22)
@@ -1509,8 +1523,23 @@ class APGIPipeline:
                 )
             except Exception as e:
                 avalanche_stats = {"status": "error", "error": str(e)}
+        # AUD-DEF-03 / APGI-INT-003: a sub-analysis that raised must not be
+        # reported under an overall "success". The outcome is "partial" when
+        # the core analyses completed but an optional one failed; consumers
+        # (certification, reports) must treat anything but "success" as not
+        # certifiable.
+        failed = [
+            name
+            for name, stats in (
+                ("lorentzian_superposition", lorentzian_stats),
+                ("avalanche_power_law", avalanche_stats),
+            )
+            if isinstance(stats, dict) and stats.get("status") == "error"
+        ]
         return {
-            "status": "success",
+            "status": "partial" if failed else "success",
+            "failed_analyses": failed,
+            "certifiable": not failed,
             "hurst_exponent": hurst_val,
             "is_pink_noise": pink_stats["is_pink_noise"],
             "beta": pink_stats["beta"],

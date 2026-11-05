@@ -6,13 +6,42 @@ Spec §14: Observable mapping to neural and behavioral data
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 
 from core.rng import RNGLike, resolve_rng
+
+#: Extensions parsed by NumPy (no optional dependency needed).
+NUMPY_EXTENSIONS: frozenset[str] = frozenset({".npy", ".npz"})
+#: Extensions parsed by MNE (optional dependency).
+MNE_EXTENSIONS: frozenset[str] = frozenset(
+    {".fif", ".edf", ".bdf", ".gdf", ".set", ".vhdr", ".cnt", ".mff", ".nxe", ".egi"}
+)
+
+
+class DatasetLoadError(RuntimeError):
+    """A dataset file exists in a supported format but could not be parsed."""
+
+
+class OptionalDependencyError(ImportError):
+    """The parser for a supported format is an optional dependency that is not installed."""
+
+
+class UnsupportedFormatError(ValueError):
+    """The file format is not one this loader supports."""
+
+
+def _file_sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 @dataclass
@@ -52,57 +81,104 @@ class EmpiricalDataLoader:
         channel_names: list[str] | None = None,
         event_markers: dict[str, int] | None = None,
     ) -> dict[str, Any]:
-        """Load EEG dataset for validation.
-        Expected format: EDF, FIF, or NumPy arrays.
+        """Load an EEG dataset, choosing the parser from the file format.
+
+        Parser selection is explicit (AUD-DEF-12) rather than "try MNE, then
+        anything":
+
+        * ``.npy`` / ``.npz`` — NumPy, with ``allow_pickle=False`` (pickled
+          object arrays can execute code and are refused as untrusted input).
+        * MNE formats (:data:`MNE_EXTENSIONS`) — MNE. If MNE is not installed a
+          :class:`OptionalDependencyError` is raised; there is no silent NumPy
+          fallback, because NumPy cannot parse these formats and a "successful"
+          fallback would only hide the real problem.
+        * anything else — :class:`UnsupportedFormatError`.
+
+        A parse failure raises :class:`DatasetLoadError` with the original
+        exception chained, so a corrupt file is never confused with a missing
+        optional dependency. The returned dict carries a ``provenance`` record
+        (path, format, parser, SHA-256 of the file bytes).
+
         Args:
             file_path: Path to data file
-            channel_names: Channels to extract (None = all)
+            channel_names: List of channel names to load
             event_markers: Mapping of event names to marker codes
         Returns:
-            Dictionary with signals, events, and metadata
+            Dictionary with signals, events, metadata and provenance
         """
-        try:
-            # Try MNE for standard EEG formats
-            import mne  # type: ignore[import-not-found]
+        path = Path(file_path)
+        ext = "".join(path.suffixes[-1:]).lower()
+        if ext in NUMPY_EXTENSIONS:
+            result = self._load_numpy_eeg(path)
+            parser = "numpy"
+        elif ext in MNE_EXTENSIONS:
+            try:
+                import mne  # type: ignore[import-not-found]
+            except ImportError as exc:
+                raise OptionalDependencyError(
+                    f"{path.name}: format {ext!r} requires the optional dependency 'mne'"
+                ) from exc
+            try:
+                result = self._load_mne_eeg(mne, path, channel_names, event_markers)
+            except Exception as exc:
+                raise DatasetLoadError(f"{path.name}: MNE could not parse the file: {exc}") from exc
+            parser = "mne"
+        else:
+            raise UnsupportedFormatError(
+                f"{path.name}: unsupported EEG format {ext!r}; supported: "
+                f"{sorted(NUMPY_EXTENSIONS | MNE_EXTENSIONS)}"
+            )
+        result["provenance"] = {
+            "path": str(path),
+            "format": ext,
+            "parser": parser,
+            "sha256": _file_sha256(path) if path.is_file() else None,
+        }
+        self.data = result
+        return result
 
-            raw = mne.io.read_raw(file_path, preload=True)
-            if channel_names:
-                raw.pick_channels(channel_names)
-            data = raw.get_data()
-            sfreq = raw.info["sfreq"]
-            result = {
-                "signals": data,
-                "fs": sfreq,
-                "channels": raw.ch_names,
-                "duration": data.shape[1] / sfreq,
-                "events": None,
-            }
-            # Extract events if markers provided
-            if event_markers:
-                events, event_dict = mne.events_from_annotations(raw)
-                result["events"] = events
-                result["event_dict"] = event_dict
-            self.data = result
-            return result
-        except (ImportError, Exception):
-            # Fallback: load NumPy array
-            data = np.load(file_path, allow_pickle=True)
-            if isinstance(data, np.lib.npyio.NpzFile):
-                sig_key = "signals" if "signals" in data.files else "arr_0"
-                fs_val = float(data["fs"]) if "fs" in data.files else float(self.config.fs)
-                ch_val = list(data["channels"]) if "channels" in data.files else []
-                self.data = {
-                    "signals": data[sig_key],
-                    "fs": fs_val,
-                    "channels": ch_val,
-                }
-            else:
-                self.data = {
-                    "signals": data,
-                    "fs": self.config.fs,
-                    "channels": [f"ch_{i}" for i in range(data.shape[0])],
-                }
-            return self.data
+    def _load_mne_eeg(
+        self,
+        mne: Any,
+        path: Path,
+        channel_names: list[str] | None,
+        event_markers: dict[str, int] | None,
+    ) -> dict[str, Any]:
+        raw = mne.io.read_raw(str(path), preload=True)
+        if channel_names:
+            raw.pick_channels(channel_names)
+        data = raw.get_data()
+        sfreq = raw.info["sfreq"]
+        result: dict[str, Any] = {
+            "signals": data,
+            "fs": sfreq,
+            "channels": raw.ch_names,
+            "duration": data.shape[1] / sfreq,
+            "events": None,
+        }
+        if event_markers:
+            events, event_dict = mne.events_from_annotations(raw)
+            result["events"] = events
+            result["event_dict"] = event_dict
+        return result
+
+    def _load_numpy_eeg(self, path: Path) -> dict[str, Any]:
+        try:
+            data = np.load(path, allow_pickle=False)
+        except (OSError, ValueError, EOFError) as exc:
+            raise DatasetLoadError(f"{path.name}: NumPy could not parse the file: {exc}") from exc
+        if isinstance(data, np.lib.npyio.NpzFile):
+            sig_key = "signals" if "signals" in data.files else "arr_0"
+            if sig_key not in data.files:
+                raise DatasetLoadError(f"{path.name}: no 'signals' or 'arr_0' array")
+            fs_val = float(data["fs"]) if "fs" in data.files else float(self.config.fs)
+            ch_val = [str(c) for c in data["channels"]] if "channels" in data.files else []
+            return {"signals": data[sig_key], "fs": fs_val, "channels": ch_val}
+        return {
+            "signals": data,
+            "fs": self.config.fs,
+            "channels": [f"ch_{i}" for i in range(data.shape[0])],
+        }
 
     def load_behavioral_dataset(
         self,

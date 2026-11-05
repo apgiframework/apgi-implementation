@@ -84,11 +84,21 @@ python tools/run_k7.py --out /tmp/try --subjects 10 --estimator laplace   # quic
   by the ODE generator, fitted by differential-evolution MCMC. Reports recovery `r`, bias, nRMSE,
   95% coverage, pairwise posterior correlation, per tercile of the true value, and R̂/ESS
   separately. Criteria: `r ≥ 0.70`, pairwise `|r| < 0.60`, coverage in `[0.90, 0.98]`.
-* **Gate table** (`gates/gate-table.yaml`): `k7a`, `k7b`, `k7c`, `exposable` per parameter and
-  for the composite. `k7b` is empirical and stays `PENDING_DATA`; `exposable` is the desk-science
-  verdict (K7a and K7c both `CONFIRMED`) and is provisional until K7b reports.
+* **Gate table** (`gates/gate-table.yaml`, written by `tools/run_k7.py`): `k7a`, `k7b`, `k7c`,
+  `desk_exposable` and `exposable` per parameter and for the composite. `k7b` is empirical and
+  stays `PENDING_DATA`. `desk_exposable` is the provisional desk-science verdict (K7a and K7c both
+  `CONFIRMED`); `exposable` — the only flag that authorises production reporting — additionally
+  requires K7b `CONFIRMED` and an approval record (`approve_gate_table`), so it is `false`
+  everywhere until K7b reports (AUD-DEF-11). The composite is K7c-`CONFIRMED` only when the
+  sampler converged for both `α` and `Π` (AUD-K7-CONVERGENCE).
 
 ### What the analysis shows
+
+> **Evidence status — provisional, not retained.** The numerical findings below come from a
+> development run of `tools/run_k7.py` against the *provisional* `apgi_reduced` contract
+> (S1-REG-04 is not yet approved). The `gates/` directory is **not committed** to this
+> repository, so these figures are not backed by a retained, hash-verified artefact; treat them as
+> expectations to be confirmed by a recorded K7 run, not as results (AUD-GOV-05).
 
 * Behaviour constrains only `αΠ`: the symmetry gap is exactly 0, the sensitivity matrix has rank 1,
   and multi-start search finds equivalent solutions. Reporting `Π` alone from such a task would be
@@ -100,8 +110,8 @@ python tools/run_k7.py --out /tmp/try --subjects 10 --estimator laplace   # quic
   (pairwise `|r|` ≈ 0.9). Recovery correlations are high (r ≈ 0.9) yet the pairwise criterion fails,
   which is exactly the three-parameter trade-off that pairwise screening can miss.
 * `θ₀` is the one individual parameter that clears every desk gate under the full design.
-* Convergence and identifiability are reported separately. See `gates/gate-table.yaml` for the
-  committed verdicts and `gates/k7c-results.json` for R̂/ESS.
+* Convergence and identifiability are reported separately. A K7 run writes the verdicts to
+  `gates/gate-table.yaml` and R̂/ESS to `gates/k7c-results.json`; neither is committed yet.
 
 ### Limits
 
@@ -123,3 +133,9 @@ id/version/hash, model id/version, commits (implementation, framework, spec), `d
 `platform_release`. A run is marked `reproducible` only when nothing blocks it: unset seed,
 unresolved or dirty commit, missing dataset or protocol hash, or an inaccessible gate table each
 list a blocker. `verify_manifest` re-checks referenced files against their recorded hashes.
+
+Since the audit remediation the manifest also requires *verified* identities (AUD-DEF-02): SHA-256
+and 40-hex commit formats, a registered model at its registered version, a framework and spec
+commit, a gate table that parses as one, a dataset provenance record (source, version, checksum,
+license, history — APGI-DAT-004) and a protocol lock verified by `runtime/protocol_lock.py`
+(APGI-REP-001). `mode="confirmatory"` is refused without a verified lock (APGI-REP-004).

@@ -6,9 +6,18 @@ parameters flagged ``exposable`` may be reported from a task.
 
 Statuses are ``CONFIRMED`` / ``FALSIFIED`` / ``INDETERMINATE``. K7b is the
 empirical (data-dependent) gate and cannot be resolved by desk science: every
-row carries ``k7b: PENDING_DATA``. ``exposable`` is therefore the *desk-science*
-verdict — K7a and K7c both CONFIRMED — and the allow-list stays provisional
-until K7b reports.
+row carries ``k7b: PENDING_DATA``.
+
+Two verdicts are kept apart (AUD-DEF-11):
+
+* ``desk_exposable`` — K7a and K7c both CONFIRMED. Provisional; listed in
+  ``provisional_allow_list`` for planning only.
+* ``exposable`` — K7a, K7b and K7c all CONFIRMED **and** the table carries an
+  approval record (:func:`approve_gate_table`). Only this drives
+  ``allow_list`` and production exposure. With K7b pending it is always False.
+
+The ``αΠ`` composite is CONFIRMED by K7c only when the sampler converged for
+both factors it is built from (AUD-K7-CONVERGENCE); otherwise INDETERMINATE.
 """
 
 from __future__ import annotations
@@ -21,7 +30,7 @@ from typing import Any
 
 from models.parameters import REDUCED_PARAMETERS
 
-from .composite import COMPOSITE_NAME
+from .names import COMPOSITE_NAME
 from .recovery_simulation import COVERAGE_RANGE, R_MIN, RecoveryResult, evaluate_criteria
 
 __all__ = [
@@ -32,6 +41,8 @@ __all__ = [
     "dump_yaml",
     "write_gate_table",
     "allow_list",
+    "provisional_allow_list",
+    "approve_gate_table",
 ]
 
 STATUSES = ("CONFIRMED", "FALSIFIED", "INDETERMINATE")
@@ -91,15 +102,22 @@ def classify_k7c(result: RecoveryResult) -> dict[str, dict[str, Any]]:
             status = "FALSIFIED"
         out[name] = {**c, "status": status}
     cm = result.composite_metrics
-    comp_ok = bool(cm["r"] >= R_MIN and COVERAGE_RANGE[0] <= cm["coverage95"] <= COVERAGE_RANGE[1])
-    comp_status = (
-        "CONFIRMED"
-        if comp_ok
-        else "INDETERMINATE"
-        if cm["r"] >= R_MIN and _coverage_marginal(cm["coverage95"], result.n_subjects)
-        else "FALSIFIED"
+    # The composite is a function of α and Π draws, so it inherits their
+    # convergence: unconverged chains for either factor make it unresolvable.
+    factor_conv = [crit[n]["converged"] for n in ("alpha", "pi") if n in crit]
+    comp_converged: bool | None = (
+        None if all(c is None for c in factor_conv) else all(c is True for c in factor_conv)
     )
-    out[COMPOSITE_NAME] = {**cm, "status": comp_status}
+    comp_ok = bool(cm["r"] >= R_MIN and COVERAGE_RANGE[0] <= cm["coverage95"] <= COVERAGE_RANGE[1])
+    if comp_converged is False:
+        comp_status = "INDETERMINATE"
+    elif comp_ok:
+        comp_status = "CONFIRMED"
+    elif cm["r"] >= R_MIN and _coverage_marginal(cm["coverage95"], result.n_subjects):
+        comp_status = "INDETERMINATE"
+    else:
+        comp_status = "FALSIFIED"
+    out[COMPOSITE_NAME] = {**cm, "converged": comp_converged, "status": comp_status}
     return out
 
 
@@ -149,7 +167,8 @@ def build_gate_table(
                 "k7a": k7a_status,
                 "k7b": K7B_PENDING,
                 "k7c": c["status"],
-                "exposable": bool(k7a_status == "CONFIRMED" and c["status"] == "CONFIRMED"),
+                "desk_exposable": bool(k7a_status == "CONFIRMED" and c["status"] == "CONFIRMED"),
+                "exposable": False,
                 "reason": _reason(name, k7a_status, c["status"], c),
                 "recovery_r": round(float(c["r"]), 4),
                 "coverage95": round(float(c["coverage95"]), 4),
@@ -166,7 +185,8 @@ def build_gate_table(
             "k7a": comp_a,
             "k7b": K7B_PENDING,
             "k7c": comp_c["status"],
-            "exposable": bool(comp_a == "CONFIRMED" and comp_c["status"] == "CONFIRMED"),
+            "desk_exposable": bool(comp_a == "CONFIRMED" and comp_c["status"] == "CONFIRMED"),
+            "exposable": False,
             "reason": _reason(COMPOSITE_NAME, comp_a, comp_c["status"], comp_c),
             "recovery_r": round(float(comp_c["r"]), 4),
             "coverage95": round(float(comp_c["coverage95"]), 4),
@@ -182,21 +202,81 @@ def build_gate_table(
             "estimator": k7c.estimator,
         },
         "k7b_note": "K7b is empirical and cannot be resolved by desk science; "
-        "exposable reflects K7a and K7c only and is provisional until K7b reports.",
+        "desk_exposable reflects K7a and K7c only and is provisional. exposable "
+        "additionally requires K7b CONFIRMED and an approval record.",
         "criteria": {
             "recovery_r_min": R_MIN,
             "pairwise_abs_posterior_corr_max": 0.60,
             "coverage95_range": list(COVERAGE_RANGE),
         },
         "meta": dict(meta or {}),
+        "approval": None,
         "parameters": rows,
-        "allow_list": [r["parameter"] for r in rows if r["exposable"]],
+        "allow_list": [],
+        "provisional_allow_list": [r["parameter"] for r in rows if r["desk_exposable"]],
     }
 
 
+def approve_gate_table(
+    table: Mapping[str, Any],
+    *,
+    k7b: Mapping[str, str],
+    approver: str,
+    date: str,
+    reference: str,
+) -> dict[str, Any]:
+    """Return a copy of ``table`` with K7b results and an approval record applied.
+
+    Args:
+        table: Output of :func:`build_gate_table`.
+        k7b: ``{parameter: status}`` from the empirical K7b analysis; every row
+            must be covered and each status must be one of :data:`STATUSES`.
+        approver: Named approver (scientific authority).
+        date: ISO date of approval.
+        reference: Identifier of the approval record (decision log, ticket).
+
+    Raises:
+        ValueError: On missing/unknown K7b statuses or empty approval fields.
+    """
+    if not (approver.strip() and date.strip() and reference.strip()):
+        raise ValueError("approver, date and reference are all required")
+    rows = []
+    for r in table["parameters"]:
+        status = k7b.get(r["parameter"])
+        if status not in STATUSES:
+            raise ValueError(f"K7b status for {r['parameter']!r} missing or invalid: {status!r}")
+        row = {**r, "k7b": status}
+        row["exposable"] = bool(row["desk_exposable"] and status == "CONFIRMED")
+        rows.append(row)
+    out = {**table, "parameters": rows}
+    out["approval"] = {"approver": approver, "date": date, "reference": reference}
+    out["allow_list"] = [r["parameter"] for r in rows if r["exposable"]]
+    return out
+
+
 def allow_list(table: Mapping[str, Any]) -> list[str]:
-    """Parameters that may be exposed according to ``table``."""
-    return [r["parameter"] for r in table["parameters"] if r["exposable"]]
+    """Parameters approved for production exposure according to ``table``.
+
+    Empty unless the table carries an approval record and the row passed every
+    gate (K7a, K7b, K7c). A table without approval exposes nothing, whatever its
+    rows say — a hand-edited ``exposable: true`` does not authorise reporting.
+    """
+    approval = table.get("approval")
+    if not approval or not all(approval.get(k) for k in ("approver", "date", "reference")):
+        return []
+    return [
+        r["parameter"]
+        for r in table["parameters"]
+        if r.get("exposable")
+        and r.get("k7a") == "CONFIRMED"
+        and r.get("k7b") == "CONFIRMED"
+        and r.get("k7c") == "CONFIRMED"
+    ]
+
+
+def provisional_allow_list(table: Mapping[str, Any]) -> list[str]:
+    """Desk-science (K7a + K7c) candidates; never authorises exposure."""
+    return [r["parameter"] for r in table["parameters"] if r.get("desk_exposable")]
 
 
 def _scalar(v: Any) -> str:

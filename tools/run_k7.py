@@ -109,7 +109,10 @@ def main(argv: list[str] | None = None) -> int:
     (out / "k7-manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    print(f"gate table written; allow-list = {table['allow_list']}")
+    print(
+        f"gate table written; allow-list = {table['allow_list']} "
+        f"(provisional, K7b pending: {table['provisional_allow_list']})"
+    )
     return 0
 
 

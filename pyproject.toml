@@ -22,7 +22,9 @@ authors = [
     {name = "Dimitry Pesochin", email = "dimitry@apgiframework.com"}
 ]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    # Not "Production/Stable": no release certificate exists yet (APGI-REL-001,
+    # AUD-GOV-05). Raise only when a certified release record is retained.
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     # No "License ::" classifier: PEP 639 supersedes it with the `license`
@@ -124,6 +126,12 @@ include = [
 # Editable installs masked the problem by putting the source tree on sys.path.
 [tool.setuptools]
 py-modules = ["pipeline", "config", "main"]
+
+# Qualification needs its frozen vectors and record at run time; without this
+# the wheel shipped reference.py but not the data it verifies against
+# (AUD-DEF-07). The package-wheel CI job runs qualification from /tmp.
+[tool.setuptools.package-data]
+qualification = ["*.json"]
 [tool.black]
 line-length = 100
 target-version = ["py310", "py311", "py312", "py313"]

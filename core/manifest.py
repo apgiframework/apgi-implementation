@@ -162,7 +162,15 @@ def build_manifest(
         },
         "dependencies": dependency_versions(),
         "validation_warnings": list(validation_warnings or []),
+        # ``spec_conformant`` means only "no configuration-range departures were
+        # recorded". It is NOT a statement that the run followed a registered
+        # analysis plan (AUD-REP-004): that requires a verified protocol lock
+        # (runtime.protocol_lock) recorded in a run manifest. Until then every
+        # run is labelled exploratory.
         "spec_conformant": not validation_warnings,
+        "conformance_scope": "configuration range checks only",
+        "registered_plan_verified": False,
+        "analysis_label": "exploratory",
     }
     if extra:
         manifest.update(extra)

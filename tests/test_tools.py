@@ -94,10 +94,12 @@ class TestCommittedGateTable:
             assert r["k7c"] in ("CONFIRMED", "FALSIFIED", "INDETERMINATE")
             assert r["k7b"] == "PENDING_DATA"
             assert isinstance(r["exposable"], bool)
+            # K7b pending ⇒ nothing is production-exposable (AUD-DEF-11).
+            assert r["exposable"] is False
 
     def test_exposable_rows_meet_the_registered_criteria(self, table):
         for r in table["parameters"]:
-            if r["exposable"]:
+            if r["desk_exposable"]:
                 assert r["k7a"] == r["k7c"] == "CONFIRMED"
                 assert r["recovery_r"] >= R_MIN
                 assert COVERAGE_RANGE[0] <= r["coverage95"] <= COVERAGE_RANGE[1]
@@ -123,5 +125,5 @@ class TestCommittedGateTable:
     def test_individual_alpha_and_pi_are_not_exposable(self, table):
         """The α–Π degeneracy is the register's headline expectation; the data must agree."""
         rows = {r["parameter"]: r for r in table["parameters"]}
-        assert not rows["alpha"]["exposable"] and not rows["pi"]["exposable"]
-        assert rows[COMPOSITE_NAME]["exposable"]
+        assert not rows["alpha"]["desk_exposable"] and not rows["pi"]["desk_exposable"]
+        assert rows[COMPOSITE_NAME]["desk_exposable"]

@@ -117,7 +117,11 @@ def safe_nperseg(signal_length: int, requested: int | None = None, minimum: int 
     return int(max(min(target, signal_length), min(minimum, signal_length)))
 
 
-def safe_log(x: np.ndarray, floor: float = np.finfo(float).tiny) -> np.ndarray:
+#: Smallest positive normal float64 (2.2250738585072014e-308), as a plain float.
+_FLOAT_TINY: float = float(np.finfo(float).tiny)
+
+
+def safe_log(x: np.ndarray, floor: float = _FLOAT_TINY) -> np.ndarray:
     """Elementwise natural log with a positive floor.
 
     ``np.log`` of zero emits "divide by zero encountered in log" and yields

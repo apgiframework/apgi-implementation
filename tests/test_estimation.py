@@ -421,16 +421,54 @@ class TestComposite:
         with pytest.raises(ValueError):
             comp.composite_from_samples(np.zeros(3), np.zeros(4))
 
-    def test_factors_refused_unless_design_separates_them(self):
+    def test_diagnostic_factors_are_labelled_and_still_gated_by_design(self):
         a, p = np.ones(5), np.ones(5)
         with pytest.raises(FactorsNotSeparableError, match=COMPOSITE_NAME):
-            expose_factors(a, p, ("behavior",), separable=False)
-        assert set(expose_factors(a, p, FULL, separable=True)) == {"alpha", "pi"}
+            comp.diagnostic_factors(a, p, ("behavior",), separable=False)
+        out = comp.diagnostic_factors(a, p, FULL, separable=True)
+        assert out["diagnostic"] is True and out["reportable"] is False
+
+    def test_production_exposure_has_no_bypass(self):
+        """AUD-DEF-11: the old ``separable=True`` shortcut no longer exists."""
+        with pytest.raises(TypeError):
+            expose_factors(np.ones(2), np.ones(2), FULL, separable=True)  # type: ignore[call-arg]
+
+    def test_production_exposure_requires_approved_table(self):
+        table = {
+            "design": {"channels": list(FULL)},
+            "approval": None,
+            "parameters": [
+                {
+                    "parameter": n,
+                    "k7a": "CONFIRMED",
+                    "k7b": "PENDING_DATA",
+                    "k7c": "CONFIRMED",
+                    "desk_exposable": True,
+                    "exposable": True,
+                }
+                for n in ("alpha", "pi")
+            ],
+        }
+        # Hand-edited exposable=True without approval and with K7b pending: refused.
+        with pytest.raises(FactorsNotSeparableError, match="authorise"):
+            expose_factors(np.ones(2), np.ones(2), FULL, gate_table=table)
+        with pytest.raises(ValueError, match="K7b status"):
+            gt.approve_gate_table(
+                table, k7b={"alpha": "PENDING_DATA"}, approver="x", date="d", reference="r"
+            )
+        approved = gt.approve_gate_table(
+            table,
+            k7b={"alpha": "CONFIRMED", "pi": "CONFIRMED"},
+            approver="Scientific authority",
+            date="2026-11-05",
+            reference="DEC-TEST",
+        )
+        assert gt.allow_list(approved) == ["alpha", "pi"]
+        with pytest.raises(FactorsNotSeparableError, match="does not match"):
+            expose_factors(np.ones(2), np.ones(2), ("behavior",), gate_table=approved)
 
     def test_design_verdict_comes_from_k7a(self):
         assert design_separates_factors(("behavior",), n_points=10) is False
-        with pytest.raises(FactorsNotSeparableError):
-            expose_factors(np.ones(2), np.ones(2), ("behavior",))
 
 
 def _fake_k7a(**over):
@@ -460,9 +498,15 @@ class TestGateTable:
         for r in rows.values():
             assert r["k7b"] == "PENDING_DATA"
             assert {r["k7a"], r["k7c"]} <= set(gt.STATUSES)
-            assert r["exposable"] == (r["k7a"] == "CONFIRMED" and r["k7c"] == "CONFIRMED")
-        assert t["allow_list"] == gt.allow_list(t) == [n for n, r in rows.items() if r["exposable"]]
-        assert rows["alpha"]["exposable"] is False  # K7a falsified ⇒ never exposable
+            assert r["desk_exposable"] == (r["k7a"] == "CONFIRMED" and r["k7c"] == "CONFIRMED")
+            assert r["exposable"] is False  # K7b pending, no approval
+        assert t["allow_list"] == gt.allow_list(t) == []
+        assert (
+            t["provisional_allow_list"]
+            == gt.provisional_allow_list(t)
+            == [n for n, r in rows.items() if r["desk_exposable"]]
+        )
+        assert rows["alpha"]["desk_exposable"] is False  # K7a falsified ⇒ never exposable
         assert "K7b" in t["k7b_note"]
 
     def test_k7a_falsified_blocks_exposure_even_with_good_recovery(self, result):
@@ -470,7 +514,9 @@ class TestGateTable:
             _fake_k7a(classification=dict.fromkeys(REDUCED_PARAMETER_NAMES, "FALSIFIED")), result
         )
         assert all(
-            not r["exposable"] for r in t["parameters"] if r["parameter"] in REDUCED_PARAMETER_NAMES
+            not r["desk_exposable"]
+            for r in t["parameters"]
+            if r["parameter"] in REDUCED_PARAMETER_NAMES
         )
 
     def test_yaml_is_valid_and_equivalent_to_json(self, result, tmp_path):
