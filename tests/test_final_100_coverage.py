@@ -409,7 +409,9 @@ class TestPipelineValidate:
             side_effect=RuntimeError("forced lorentzian failure"),
         ):
             out = p.validate()
-        assert out["status"] == "success"
+        # AUD-DEF-03: a failed sub-analysis is reported as partial, never success.
+        assert out["status"] == "partial"
+        assert out["failed_analyses"] == ["lorentzian_superposition"]
         assert out["lorentzian_superposition"]["status"] == "error"
 
     def test_validate_avalanche_block(self) -> None:
@@ -442,7 +444,9 @@ class TestPipelineValidate:
             side_effect=RuntimeError("forced avalanche failure"),
         ):
             out = p.validate()
-        assert out["status"] == "success"
+        # AUD-DEF-03: a failed sub-analysis is reported as partial, never success.
+        assert out["status"] == "partial"
+        assert out["failed_analyses"] == ["avalanche_power_law"]
         assert out["avalanche_power_law"]["status"] == "error"
 
 

@@ -5,7 +5,7 @@ Three independent kinds of evidence:
 * **Hand-derived values** — closed-form numbers computed from the equations;
 * **Independent re-implementation** — plain-float code in
   :mod:`qualification.reference` that shares no helper with the production module;
-* **Frozen fixture** — trajectory digests in ``tests/golden/reference_vectors.json``.
+* **Frozen fixture** — trajectory digests in ``qualification/reference_vectors.json``.
   A deliberate change to the dynamics fails the fixture; regenerate with
   ``python -m qualification.reference --update`` and say so in the commit message.
 """

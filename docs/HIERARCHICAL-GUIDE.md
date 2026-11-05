@@ -70,13 +70,39 @@ config = {"hierarchical_mode": "full"}
 - Bottom-up threshold cascade
 - Oscillatory phase dynamics at each level
 ---
+## Canonical temporal hierarchy (APGI-SCI-003)
+
+The specification defines five levels. `hierarchy/levels.py` is the single
+machine-readable source for these labels and bands:
+
+| Level | Span | Role |
+|---|---|---|
+| L0 | 10–100 ms | reflexive substrate — never ignites, no array slot |
+| L1 | 100 ms–3 s | first APGI ignition level — **array index 0** |
+| L2 | 1–30 min | array index 1 |
+| L3 | hours–days (quantified as 1 h–7 d, pending confirmation) | array index 2 |
+| L4 | months–years (quantified as 1 month–100 y, pending confirmation) | array index 3 |
+
+**Index convention.** Per-level arrays hold ignition levels only, so array
+index 0 is **L1**, not L0. Use `hierarchy.levels.label_for_index()` rather than
+re-deriving the offset. The specification leaves gaps (3 s–1 min, 30 min–1 h,
+7 d–1 month); `level_of()` returns `None` there, and the open questions are
+listed in `hierarchy.levels.SOURCE_AMBIGUITIES`.
+
+**Demo configuration.** The diagram below shows the lightweight *numerical*
+configuration (`tau_0 = 10 ms`, geometric ratio 1.6). Its timescales all fall
+inside the L0 band, so it does **not** realise the canonical L1–L4 spans;
+`hierarchy.levels.audit_tau_ms()` reports this departure. Use
+`hierarchical_timescale_mode="canonical"` for spec-scale timescales.
+
 ## Architecture Overview
-The hierarchical system implements multi-scale error processing across L levels:
+The hierarchical system implements multi-scale error processing across L levels
+(array indices shown; index 0 corresponds to canonical L1):
 ```text
-Level 0 (Fast):    τ_0 = 10ms    → z_e^(0), z_i^(0)    → Π_0, θ_0
-Level 1:           τ_1 = 16ms    → z_e^(1), z_i^(1)    → Π_1, θ_1
-Level 2:           τ_2 = 26ms    → z_e^(2), z_i^(2)    → Π_2, θ_2
-Level 3 (Slow):    τ_3 = 42ms    → z_e^(3), z_i^(3)    → Π_3, θ_3
+Index 0 (Fast):    τ_0 = 10ms    → z_e^(0), z_i^(0)    → Π_0, θ_0
+Index 1:           τ_1 = 16ms    → z_e^(1), z_i^(1)    → Π_1, θ_1
+Index 2:           τ_2 = 26ms    → z_e^(2), z_i^(2)    → Π_2, θ_2
+Index 3 (Slow):    τ_3 = 42ms    → z_e^(3), z_i^(3)    → Π_3, θ_3
                                         ↓
                             Multi-scale aggregation
                                         ↓

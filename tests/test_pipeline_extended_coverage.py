@@ -128,15 +128,32 @@ def test_pipeline_kuramoto_broadcast_ignition():
 
 
 def test_pipeline_bold_calibration():
-    # Test BOLD calibration logic
+    """BOLD-calibrated Landauer floor is applied and keeps C(t) > 0.
+
+    AUD-DEF-09: this test previously failed intermittently (seen on the py3.13
+    CI job) because it was unseeded — APGIConfig's default seed is None — and in
+    ~1.6% of draws the first-step SDE noise floored S at 0, giving C = c1·S = 0.
+    It also set a non-existent ``enforce_landauer`` key, so the BOLD floor it
+    claimed to test was never reached. The fixture is now seeded and enables the
+    real switch (``use_thermodynamic_cost``); the C > 0 requirement is kept and
+    is now guaranteed by the floor rather than by luck.
+    """
+    from energy.bold_calibration import bold_signal_to_energy, estimate_ignition_energy_spike
+
     config = get_base_config()
+    config["seed"] = 0
     config["use_bold_calibration"] = True
     config["use_realistic_cost"] = True  # Needed for BOLD path
-    config["enforce_landauer"] = True  # Trigger bold path in threshold.py
+    config["use_thermodynamic_cost"] = True  # Enforces the (BOLD) Landauer floor
     p = APGIPipeline(config)
     res = p.step(x_e=1.0, x_i=0.5)
     assert "C" in res
     assert res["C"] > 0
+    floor = estimate_ignition_energy_spike(
+        bold_signal_to_energy(2.0, conversion_factor=1.2e-18, tissue_volume=1.0), 1.075
+    ) * config.get("kappa_meta", 1e20)
+    assert res["S"] > 1e-6  # seeded: above eps_stab, so the floor applies
+    assert res["C"] >= floor * (1 - 1e-12)
     # BOLD calibration adds bold_calibration dict to result with bold_signal_change
     assert "bold_calibration" in res
     assert "bold_signal_change" in res["bold_calibration"]

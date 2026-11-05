@@ -82,24 +82,69 @@ jobs:
 
   security:
     name: security
+    # AUD-DEF-10 / APGI-API-003 / APGI-IMP-001: audit the dependency set that is
+    # actually released — the built wheel plus its declared runtime extras,
+    # resolved into a clean environment — not the environment that merely holds
+    # the scanning tools. The resolved lock, SBOM and scan reports are retained
+    # as artifacts for the candidate.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
 
-      - name: Install
+      - name: Install scanners
         run: |
-          python -m pip install --upgrade pip
-          pip install bandit[toml] pip-audit
+          python -m pip install --upgrade pip build
+          pip install bandit[toml] pip-audit cyclonedx-bom detect-secrets
 
       - name: Bandit
         run: bandit -r . -c bandit.yaml -ll --exclude ./tests,./build,./.venv
 
-      - name: Audit dependencies for known CVEs
-        run: pip-audit --strict --desc
+      - name: Build the release wheel
+        run: python -m build --wheel
+
+      - name: Resolve the released dependency set into a clean environment
+        # The `estimation` extra (PyMC) is excluded: it requires numpy>=2, which
+        # the released package caps below (see DEPENDENCY-MATRIX.md).
+        run: |
+          python -m venv /tmp/release-env
+          /tmp/release-env/bin/pip install --upgrade pip
+          /tmp/release-env/bin/pip install "$(ls dist/*.whl)[sci,analysis,reservoir]"
+          /tmp/release-env/bin/pip freeze --exclude-editable | grep -v '^apgi' > release-lock.txt
+          sha256sum dist/*.whl > release-artifacts.sha256
+          cat release-lock.txt
+
+      - name: Audit the released dependency set for known CVEs
+        run: pip-audit --strict --desc -r release-lock.txt -f json -o pip-audit.json || (cat pip-audit.json; exit 1)
+
+      - name: SBOM (CycloneDX) for the released environment
+        run: cyclonedx-py environment /tmp/release-env/bin/python --of JSON -o sbom.cdx.json
+
+      - name: Secret scan (content, not filenames)
+        # High-entropy plugins are disabled: the repository legitimately stores
+        # SHA-256 digests (fixtures, qualification record) that they flag.
+        run: |
+          detect-secrets scan --all-files \
+            --disable-plugin HexHighEntropyString \
+            --disable-plugin Base64HighEntropyString > secrets-scan.json
+          python -c "import json,sys; r=json.load(open('secrets-scan.json'))['results']; print(json.dumps(r, indent=2)); sys.exit(1 if r else 0)"
+
+      - name: Retain release security evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-security-evidence
+          path: |
+            release-lock.txt
+            release-artifacts.sha256
+            pip-audit.json
+            sbom.cdx.json
+            secrets-scan.json
 
   package:
     name: wheel installs and imports
@@ -135,6 +180,14 @@ jobs:
           print('wheel import + step OK')
           "
           /tmp/verify/bin/apgi --steps 20 --seed 1
+
+      - name: Installed wheel qualifies itself outside the source tree
+        # AUD-DEF-07: the frozen vectors and qualification record are package
+        # data; verification must not depend on files only present in a checkout.
+        run: |
+          /tmp/verify/bin/pip install "$(ls dist/*.whl)[sci]"
+          cd /tmp
+          /tmp/verify/bin/python -m qualification.reference
 
   reproducibility:
     name: seeded runs are bit-for-bit reproducible

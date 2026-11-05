@@ -36,6 +36,12 @@ from typing import Any, ClassVar
 
 import numpy as np
 
+from core.finite import (
+    require_finite_array,
+    require_finite_scalar,
+    require_optional_finite_scalar,
+    require_positive_finite,
+)
 from core.rng import resolve_rng
 
 from .base import APGIModel
@@ -100,8 +106,10 @@ class ReducedParams:
                 raise ValueError(
                     f"{name}={value!r} outside support [{spec.lower}, {spec.upper}] ({spec.symbol})"
                 )
-        if self.sigma_r <= 0 or self.sigma_y <= 0:
-            raise ValueError("sigma_r and sigma_y must be > 0")
+        # AUD-DEF-01: ``NaN <= 0`` is False, so a bare sign test let sigma_r=NaN
+        # and sigma_y=inf through and poisoned every downstream likelihood.
+        for name in ("sigma_r", "sigma_y"):
+            require_positive_finite(name, getattr(self, name))
 
     @classmethod
     def from_mapping(cls, params: Mapping[str, Any] | None) -> ReducedParams:
@@ -194,6 +202,7 @@ def reduced_step(
         ``S``, ``theta`` (the threshold in force), ``p_ignite``, ``B`` and the
         pre-update prediction ``xhat``.
     """
+    x = require_finite_scalar("x", x)
     eps = x - state.xhat
     drive = math.tanh(GAMMA_PHI * params.pi * abs(eps)) + params.beta
     carry = RHO if state.B_prev else 1.0
@@ -241,7 +250,7 @@ def simulate_reduced(
     Returns:
         A :class:`ReducedTrajectory`.
     """
-    x = np.asarray(stimulus, dtype=float)
+    x = require_finite_array("stimulus", stimulus)
     T = x.shape[0]
     forced = None if B_forced is None else np.asarray(B_forced, dtype=int)
     if forced is not None and forced.shape[0] != T:
@@ -294,6 +303,9 @@ class ApgiReduced(APGIModel):
         self._n = 0
 
     def step(self, x_e: float, x_i: float | None = None) -> dict[str, float]:
+        # Validate before the RNG draw so a rejected call does not advance it.
+        x_e = require_finite_scalar("x_e", x_e)
+        require_optional_finite_scalar("x_i", x_i)
         u = None if self.hard else float(self._rng.random())
         self._state, rec = reduced_step(self.reduced_params, self._state, x_e, u=u, hard=self.hard)
         self._n += 1

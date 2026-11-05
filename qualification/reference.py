@@ -14,7 +14,7 @@ equations say, deterministically, within its stated invariants:
     every fixture case.
 ``reference_vectors``
     Trajectories match the committed fixture digests
-    (``tests/golden/reference_vectors.json``).
+    (``qualification/reference_vectors.json``, shipped in the wheel).
 ``product_symmetry``
     Behaviour is invariant under ``(α, Π) → (sα, Π/s)``; the model depends on
     the factors only through ``αΠ``.
@@ -57,9 +57,13 @@ __all__ = [
     "verify_record",
 ]
 
-ROOT = Path(__file__).resolve().parent.parent
-FIXTURE_PATH = ROOT / "tests" / "golden" / "reference_vectors.json"
-RECORD_PATH = Path(__file__).resolve().parent / "apgi_reduced.qualification.json"
+# Both resources live inside the ``qualification`` package and are declared as
+# package data (pyproject.toml), so an installed wheel can qualify itself
+# outside the source tree (AUD-DEF-07). They were previously split between this
+# package and ``tests/golden/``, which the wheel does not ship.
+_PKG_DIR = Path(__file__).resolve().parent
+FIXTURE_PATH = _PKG_DIR / "reference_vectors.json"
+RECORD_PATH = _PKG_DIR / "apgi_reduced.qualification.json"
 ROUND_DP = 9
 N_ROWS = 12  # rows stored verbatim per case; the rest are covered by the digest
 

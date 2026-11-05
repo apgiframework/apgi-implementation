@@ -16,6 +16,7 @@ from collections.abc import Mapping
 from typing import Any, ClassVar
 
 from config import CONFIG
+from core.finite import require_finite_scalar, require_optional_finite_scalar
 from core.rng import resolve_rng
 from pipeline import APGIPipeline
 
@@ -130,6 +131,10 @@ class ApgiNull(APGIModel):
         self._rng = resolve_rng(seed)
 
     def step(self, x_e: float, x_i: float | None = None) -> dict[str, float]:
+        # The null ignores its input, but a malformed input is still rejected
+        # before the RNG draw so the model contract matches every other variant.
+        require_finite_scalar("x_e", x_e)
+        require_optional_finite_scalar("x_i", x_i)
         B = float(self._rng.random() < self.rate)
         return {"S": 0.0, "theta": 1.0, "B": B, "p_ignite": self.rate}
 

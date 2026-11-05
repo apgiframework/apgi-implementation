@@ -24,6 +24,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from core.finite import require_finite_array
 from models.parameters import REDUCED_PARAMETER_NAMES, REDUCED_PARAMETERS
 from models.reduced import (
     CHANNELS,
@@ -87,13 +88,21 @@ class Observed:
     amplitude: np.ndarray | None = None
 
     def __post_init__(self) -> None:
-        self.stimulus = np.asarray(self.stimulus, dtype=float)
-        self.B = np.asarray(self.B, dtype=int)
+        # AUD-DEF-01: non-finite observations are rejected at the fitting
+        # boundary; a NaN report would otherwise turn the log-likelihood into
+        # NaN and the optimiser would return an arbitrary "fit".
+        self.stimulus = require_finite_array("stimulus", self.stimulus)
         T = self.stimulus.shape[0]
-        for name in ("B", "report", "amplitude"):
+        b = require_finite_array("B", self.B)
+        if not np.all((b == 0) | (b == 1)):
+            raise ValueError("B must be binary (0/1)")
+        self.B = b.astype(int)
+        if self.B.shape != (T,):
+            raise ValueError(f"B must have shape ({T},), got {self.B.shape}")
+        for name in ("report", "amplitude"):
             arr = getattr(self, name)
             if arr is not None:
-                arr = np.asarray(arr, dtype=float if name != "B" else int)
+                arr = require_finite_array(name, arr, ndim=None)
                 setattr(self, name, arr)
                 if arr.shape != (T,):
                     raise ValueError(f"{name} must have shape ({T},), got {arr.shape}")

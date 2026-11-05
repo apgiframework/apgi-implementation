@@ -17,6 +17,12 @@ Supporting jobs that are also worth requiring: `dependency policy and qualificat
 `PyMC model matches the numpy reference` (`tests/test_estimation_pymc.py`, in its own
 environment because PyMC needs numpy>=2).
 
+`security` audits the *released* dependency set (built wheel + runtime extras resolved in a
+clean environment), emits a CycloneDX SBOM and a content secret scan, and retains them as the
+`release-security-evidence` artifact (AUD-DEF-10). `wheel installs and imports` also runs
+`python -m qualification.reference` against the installed wheel from outside the source tree
+(AUD-DEF-07).
+
 ## Making the gates required
 
 "Required on protected branches" is a repository setting, not something a workflow file can

@@ -14,6 +14,8 @@ from typing import Any, ClassVar
 
 import numpy as np
 
+from core.finite import require_finite_array
+
 __all__ = ["APGIModel", "RUN_KEYS"]
 
 #: Keys every model's :meth:`APGIModel.run` result must contain.
@@ -64,8 +66,10 @@ class APGIModel(ABC):
         Returns:
             Mapping of :data:`RUN_KEYS` to float arrays of length ``len(x_e)``.
         """
-        xs = np.asarray(x_e, dtype=float)
-        xi = None if x_i is None else np.asarray(x_i, dtype=float)
+        # Whole-sequence validation up front (AUD-DEF-01): a NaN at step 500
+        # must not leave the model 499 steps advanced when the call raises.
+        xs = require_finite_array("x_e", x_e)
+        xi = None if x_i is None else require_finite_array("x_i", x_i)
         if xi is not None and xi.shape != xs.shape:
             raise ValueError(f"x_i shape {xi.shape} does not match x_e shape {xs.shape}")
         out: dict[str, list[float]] = {k: [] for k in RUN_KEYS}
