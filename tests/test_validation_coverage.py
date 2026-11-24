@@ -66,7 +66,7 @@ def test_validate_config_failures():
     with pytest.raises(ValidationError, match="lam must be in"):
         check({"lam": 1.5})
     # Threshold dynamics
-    with pytest.raises(ValidationError, match="kappa must be > 0"):
+    with pytest.raises(ValidationError, match="decay exponent dt/tau_theta must be > 0"):
         check({"kappa": 0.0})
     # Ignition dynamics
     with pytest.raises(ValidationError, match="ignite_tau"):

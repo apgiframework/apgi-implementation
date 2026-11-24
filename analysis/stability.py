@@ -88,7 +88,9 @@ def check_stability(
     """
     # Extract parameters
     lam = config.get("lam", 0.2)
-    kappa = config.get("kappa", 0.15)
+    from config import decay_exponent
+
+    kappa = decay_exponent({"tau_theta": 20.0, "dt": 0.01, **config})  # γ_θ·dt = dt/τ_θ
     c1 = config.get("c1", 0.2)
     eta = config.get("eta", 0.1)
     # Compute Jacobian
@@ -249,7 +251,7 @@ def validate_system_dynamics(
     # Compute Jacobian
     J = compute_jacobian_discrete(
         config.get("lam", 0.2),
-        config.get("kappa", 0.15),
+        _decay_exponent_of(config),
         config.get("c1", 0.2),
         config.get("eta", 0.1),
     )
@@ -449,3 +451,10 @@ class StabilityAnalyzer:
             "fixed_point": fixed_point,
             "dynamics_validation": dynamics,
         }
+
+
+def _decay_exponent_of(config: dict) -> float:
+    """Per-step threshold decay exponent γ_θ·dt from a config (legacy 'kappa' honoured)."""
+    from config import decay_exponent
+
+    return decay_exponent({"tau_theta": 20.0, "dt": 0.01, **config})

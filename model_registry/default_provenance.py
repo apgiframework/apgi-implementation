@@ -96,7 +96,12 @@ REDUCED_DEFAULTS: tuple[DefaultProvenance, ...] = (
         "with dt=0.5 and τ_S=5 — dt and τ_S themselves are assumed",
     ),
     _r("RHO", 0.1, "assumed", "RHO_RETAIN post-ignition retention, MathSpec §6.1 default"),
-    _r("KAPPA", 0.15, "assumed", "threshold relaxation κ, config.CONFIG['kappa']"),
+    _r(
+        "KAPPA",
+        0.15,
+        "assumed",
+        "per-step threshold decay exponent dt/τ_θ, config.decay_exponent(CONFIG)",
+    ),
     _r("DELTA", 0.5, "assumed", "refractory boost δ, config.CONFIG['delta']"),
     _r("TAU_SIGMA", 0.5, "assumed", "ignition sigmoid temperature, config.CONFIG['ignite_tau']"),
     _r("GAMMA_PHI", 2.0, "assumed", "φ-transform steepness, config.CONFIG['gamma_plus']"),

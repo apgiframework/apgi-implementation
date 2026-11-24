@@ -104,7 +104,7 @@ def run_hierarchical_simulation(
         "lam": 0.1,
         "eta": 0.01,
         "delta": 0.5,
-        "kappa": 0.1,
+        "tau_theta": 0.02,  # example-specific: per-step decay exponent dt/τ_θ = 0.1 at dt = 2 ms
         # Cost-value
         "use_realistic_cost": True,
         "c1": 0.1,

@@ -21,9 +21,9 @@ ignite_tau = 0.5
 beta_sm = 0.3       # canonical [0.1, 1.2], waking sub-band [0.3, 0.8]
 
 # --- Integration (MathSpec §7.4: dt <= min(tau)/10) ---
-dt = 0.5
-tau_s = 5.0
-lam = 0.09516258196404048  # = 1 - exp(-dt/tau_S), the exact relation
+dt = 0.01            # dt₀ = 10 ms (Math Spec p1); dt <= min(tau_S, tau_theta, tau_Pi)/10
+tau_s = 0.3          # 300 ms worked value, range 0.2-0.5 s
+lam = 0.0327838995179941  # = 1 - exp(-dt/tau_S), the exact relation
 
 # --- Canonical saturating psi (MathSpec §2) ---
 psi_type = "tanh"

@@ -182,10 +182,13 @@ def _validate_threshold_dynamics(config: dict) -> None:
     Spec §4.5: Exponential decay rate κ must be > 0
     Spec §6.1: Reset factor ρ must be in (0, 1) - validated at step() time
     """
-    kappa = config.get("kappa", 0.15)
-    if kappa <= 0:
+    from config import decay_exponent
+
+    exponent = decay_exponent({"tau_theta": 20.0, "dt": 0.01, **config})
+    if exponent <= 0:
         raise ValidationError(
-            f"kappa must be > 0, got {kappa}. Spec §4.5: θ(t+1) = θ_base + (θ(t) - θ_base)·exp(-κ)"
+            f"decay exponent dt/tau_theta must be > 0, got {exponent}. "
+            "Spec Eq. 32: θ(t+1) = θ_base + (θ(t) − θ_base)·exp(−γ_θ·dt)"
         )
 
 

@@ -53,14 +53,14 @@ def main() -> None:
     config = CONFIG.copy()
     config["use_thermodynamic_cost"] = True
     config["use_bold_calibration"] = True
-    config["kappa_meta"] = calibration["target_kappa_j_per_bit"]
-    config["kappa_units"] = "joules_per_bit"
+    config["r_l"] = calibration["target_kappa_j_per_bit"]
+    config["r_l_units"] = "joules_per_bit"
     config["bold_conversion_factor"] = calibration["calibrated_conversion_factor"]
     print("APGI Configuration with BOLD calibration:")
-    print(f"  κ_meta: {config['kappa_meta']:.2e} J/bit")
-    print(f"  κ_units: {config['kappa_units']}")
+    print(f"  R_L factor: {config['r_l']:.2e} J/bit")
+    print(f"  units: {config['r_l_units']}")
     print(f"  BOLD conversion: {config['bold_conversion_factor']:.2e} J/%/cm³")
-    print(f"  Efficiency: {float(config['kappa_meta']) / e_min:.0f}× Landauer minimum")  # type: ignore[arg-type]
+    print(f"  Efficiency: {float(config['r_l']) / e_min:.0f}× Landauer minimum")  # type: ignore[arg-type]
     print("\nStep 4: Compare Energy Calculations")
     print("-" * 40)
     S_values = [0.1, 0.5, 1.0, 2.0, 5.0]
@@ -70,13 +70,13 @@ def main() -> None:
     for S in S_values:
         bits = compute_information_bits(S, eps)
         # Legacy calculation (dimensionless κ_meta = 1.0)
-        energy_legacy = compute_landauer_cost(S, eps, kappa_meta=1.0, kappa_units="dimensionless")
+        energy_legacy = compute_landauer_cost(S, eps, r_l=1.0, r_l_units="dimensionless")
         # BOLD-calibrated calculation
         energy_calibrated = compute_landauer_cost(
             S,
             eps,
-            kappa_meta=float(config["kappa_meta"]),
-            kappa_units="joules_per_bit",  # type: ignore[arg-type]
+            r_l=float(config["r_l"]),
+            r_l_units="joules_per_bit",  # type: ignore[arg-type]
         )
         ratio = energy_calibrated / energy_legacy if energy_legacy > 0 else 0
         print(

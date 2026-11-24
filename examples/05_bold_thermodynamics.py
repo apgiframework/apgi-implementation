@@ -67,12 +67,10 @@ def main() -> None:
     for S in S_values:
         bits = compute_information_bits(S, eps)
         # Uncalibrated (dimensionless κ_meta = 1.0)
-        cost_uncalibrated = compute_landauer_cost(
-            S, eps, kappa_meta=1.0, kappa_units="dimensionless"
-        )
+        cost_uncalibrated = compute_landauer_cost(S, eps, r_l=1.0, r_l_units="dimensionless")
         # Calibrated (using mean κ from BOLD calibration)
         cost_calibrated = compute_landauer_cost(
-            S, eps, kappa_meta=summary["kappa_mean"], kappa_units="joules_per_bit"
+            S, eps, r_l=summary["kappa_mean"], r_l_units="joules_per_bit"
         )
         print(f"{S:6.1f} | {bits:4.1f} | {cost_uncalibrated:10.2e} J | {cost_calibrated:10.2e} J")
     # Part 3: Validate energy against Landauer's principle
@@ -99,11 +97,11 @@ def main() -> None:
     config = CONFIG.copy()
     config["use_thermodynamic_cost"] = True
     config["use_bold_calibration"] = True
-    config["kappa_meta"] = summary["kappa_mean"]  # Use calibrated κ
-    config["kappa_units"] = "joules_per_bit"
+    config["r_l"] = summary["kappa_mean"]  # Use the calibrated factor (formerly κ_meta)
+    config["r_l_units"] = "joules_per_bit"
     print("Configuration with BOLD calibration:")
-    print(f"  κ_meta: {config['kappa_meta']:.2e} J/bit")
-    print(f"  κ_units: {config['kappa_units']}")
+    print(f"  R_L factor: {config['r_l']:.2e} J/bit")
+    print(f"  units: {config['r_l_units']}")
     print(f"  BOLD conversion factor: {config['bold_conversion_factor']:.2e} J/%/cm³")
     print(f"  Ignition spike factor: {config['bold_ignition_spike_factor']:.3f}")
     # Initialize pipeline

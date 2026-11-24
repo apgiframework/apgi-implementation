@@ -156,7 +156,7 @@ class TestThresholdDecay:
 
     def test_invalid_kappa(self):
         """Should raise ValueError for negative kappa."""
-        with pytest.raises(ValueError, match="kappa must be >= 0"):
+        with pytest.raises(ValueError, match="decay_exponent must be >= 0"):
             threshold_decay(theta=2.0, theta_base=1.0, kappa=-0.1)
 
 

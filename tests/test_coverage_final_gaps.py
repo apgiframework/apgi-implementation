@@ -121,7 +121,7 @@ class TestCoreThermodynamicsCoverage:
         """Test invalid kappa_units raises ValueError (lines 102-105)."""
         from core.thermodynamics import compute_landauer_cost
 
-        with pytest.raises(ValueError, match="kappa_units must be"):
+        with pytest.raises(ValueError, match="r_l_units must be"):
             compute_landauer_cost(S=1.0, eps=0.01, kappa_units="invalid")
 
     def test_joules_per_bit_mode(self):

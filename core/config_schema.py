@@ -54,15 +54,21 @@ class APGIConfig(BaseModel):
     ne_on_precision: bool = Field(default=True, description="NE modulates precision")
     ne_on_threshold: bool = Field(default=False, description="NE modulates threshold")
     gamma_ne: float = Field(default=0.1, ge=0, le=1, description="NE modulation strength")
-    kappa: float = Field(default=0.15, gt=0, le=1, description="Threshold decay rate")
     # Signal accumulation
-    lam: float = Field(default=0.2, gt=0, lt=1, description="Signal integration rate")
+    lam: float = Field(
+        default=0.0327838995179941,
+        gt=0,
+        lt=1,
+        description="Signal integration rate, 1 − exp(−dt/τ_S)",
+    )
     signal_log_nonlinearity: bool = Field(default=True, description="Enable log stabilization")
     use_canonical_discrete_mode: bool = Field(
         default=False, description="Use discrete accumulation instead of ODE"
     )
     # Threshold update + refractory dynamics
-    eta: float = Field(default=0.1, gt=0, le=1, description="Threshold learning rate")
+    eta: float = Field(
+        default=0.002, gt=0, le=1, description="Threshold learning rate per step (rate × dt)"
+    )
     delta: float = Field(default=0.5, ge=0, description="Refractory boost")
     # Post-ignition signal reset
     reset_factor: float = Field(default=0.1, gt=0, lt=1, description="Signal reset factor (rho)")
@@ -90,8 +96,11 @@ class APGIConfig(BaseModel):
     )
     stochastic_ignition: bool = Field(default=False, description="Enable stochastic ignition")
     # Continuous-time parameters
-    tau_s: float = Field(default=5.0, gt=0, description="Signal decay time constant")
-    dt: float = Field(default=0.5, gt=0, description="Integration time step")
+    tau_s: float = Field(default=0.3, gt=0, description="Signal decay time constant (s)")
+    dt: float = Field(default=0.01, gt=0, description="Integration time step (s); dt₀ = 10 ms")
+    r_max: float = Field(
+        default=100.0, gt=0, description="Maximal ignition rate of the hazard (1/s)"
+    )
     noise_std: float = Field(default=0.01, ge=0, description="SDE diffusion coefficient")
     # Generative model dynamics
     use_internal_predictions: bool = Field(default=True, description="Enable internal predictions")
@@ -118,12 +127,12 @@ class APGIConfig(BaseModel):
         default=1.380649e-23, gt=0, description="Boltzmann constant (J/K), CODATA exact value"
     )
     T_env: float = Field(default=310.0, gt=0, description="Environmental temperature (K)")
-    kappa_meta: float = Field(
+    r_l: float = Field(
         default=1e20,
         gt=0,
-        description="Metabolic efficiency factor (absorbs Joules→AU unit conversion)",
+        description="Erasure-overhead factor on the Landauer floor (formerly kappa_meta; absorbs J→AU)",
     )
-    kappa_units: Literal["dimensionless", "joules_per_bit"] = Field(
+    r_l_units: Literal["dimensionless", "joules_per_bit"] = Field(
         default="dimensionless", description="Metabolic cost units"
     )
     # BOLD calibration
@@ -304,7 +313,7 @@ class APGIConfig(BaseModel):
         if self.ne_on_threshold and self.gamma_ne >= 0.1:
             raise ValueError(
                 f"ne_on_threshold=True with gamma_ne={self.gamma_ne} causes threshold instability. "
-                "Use gamma_ne <= 0.01 or kappa >= 0.15. Spec §4.4."
+                "Use gamma_ne <= 0.01 or a faster threshold decay. Spec §4.4."
             )
         return self
 
