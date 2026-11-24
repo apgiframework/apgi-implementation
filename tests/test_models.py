@@ -271,12 +271,12 @@ class TestNullAndPipelineModels:
 class TestParameterMapping:
     def test_alpha_is_not_alpha_e(self):
         by = {m.symbol: m for m in MAPPINGS}
-        assert by["α"].pipeline == "kappa_e" and "alpha_e" not in {m.pipeline for m in MAPPINGS}
+        assert by["α"].pipeline == "eta_pred_e" and "alpha_e" not in {m.pipeline for m in MAPPINGS}
         assert by["Π"].pipeline is None
 
     def test_translation_roundtrip(self):
         pipe = reduced_to_pipeline({"alpha": 0.3, "pi": 1.0, "theta_base": 0.5, "beta": 0.1})
-        assert pipe == {"kappa_e": 0.3, "theta_base": 0.5, "beta": 0.1}  # pi has no counterpart
+        assert pipe == {"eta_pred_e": 0.3, "theta_base": 0.5, "beta": 0.1}  # pi has no counterpart
         assert pipeline_to_reduced(pipe) == {"alpha": 0.3, "theta_base": 0.5, "beta": 0.1}
 
     def test_aliases_resolve(self):

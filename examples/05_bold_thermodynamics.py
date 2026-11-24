@@ -2,7 +2,7 @@
 """
 APGI BOLD-Calibrated Thermodynamic Analysis Example
 This example demonstrates thermodynamic analysis using BOLD fMRI calibration
-to convert from arbitrary units to Joules per bit erased (κ_meta).
+to estimate R_L, the erasure overhead over the Landauer floor (formerly κ_meta).
 Spec Reference: §11 Thermodynamic Constraints with BOLD calibration
 """
 
@@ -40,48 +40,45 @@ def main() -> None:
         {"baseline_bold": 1.2, "ignition_bold": 3.0, "bits": 8.0, "duration": 1.0},
         {"baseline_bold": 0.8, "ignition_bold": 2.0, "bits": 5.0, "duration": 1.0},
     ]
-    print(f"Calibrating κ_meta from {len(trials)} simulated fMRI trials...")
+    print(f"Estimating R_L from {len(trials)} simulated fMRI trials...")
     for i, trial in enumerate(trials):
-        kappa = calibrator.calibrate_from_trial(
+        r_l = calibrator.calibrate_from_trial(
             trial["baseline_bold"],
             trial["ignition_bold"],
             trial["bits"],
             trial["duration"],
         )
-        print(f"  Trial {i + 1}: κ_meta = {kappa:.2e} J/bit")
+        print(f"  Trial {i + 1}: R_L = {r_l:.2e} (dimensionless)")
     summary = calibrator.get_calibration_summary()
     print("\nCalibration Summary:")
-    print(f"  κ_meta mean: {summary['kappa_mean']:.2e} J/bit")
-    print(f"  κ_meta std: {summary['kappa_std']:.2e} J/bit")
+    print(f"  R_L mean: {summary['r_l_mean']:.2e}")
+    print(f"  R_L std: {summary['r_l_std']:.2e}")
     print(f"  Landauer minimum: {summary['landauer_energy_per_bit_j']:.2e} J/bit")
-    print(
-        f"  Efficiency ratio: {summary['kappa_mean'] / summary['landauer_energy_per_bit_j']:.1f}x"
-    )
+    print(f"  Energy per bit: {summary['r_l_mean'] * summary['landauer_energy_per_bit_j']:.2e} J")
     # Part 2: Compare calibrated vs uncalibrated energy calculations
     print("\n2. Calibrated vs Uncalibrated Energy Calculations")
     print("-" * 40)
     S_values = [0.1, 0.5, 1.0, 2.0, 5.0]
     eps = 0.01
-    print("Signal | Bits | Landauer (dimensionless κ) | Landauer (calibrated κ)")
+    print("Signal | Bits | Landauer (R_L = 1) | Landauer (BOLD R_L)")
     print("-" * 80)
     for S in S_values:
         bits = compute_information_bits(S, eps)
-        # Uncalibrated (dimensionless κ_meta = 1.0)
+        # Uncalibrated (R_L = 1.0, the Landauer floor)
         cost_uncalibrated = compute_landauer_cost(S, eps, r_l=1.0, r_l_units="dimensionless")
-        # Calibrated (using mean κ from BOLD calibration)
+        # Calibrated (mean R_L from BOLD; R_L is dimensionless)
         cost_calibrated = compute_landauer_cost(
-            S, eps, r_l=summary["kappa_mean"], r_l_units="joules_per_bit"
+            S, eps, r_l=summary["r_l_mean"], r_l_units="dimensionless"
         )
         print(f"{S:6.1f} | {bits:4.1f} | {cost_uncalibrated:10.2e} J | {cost_calibrated:10.2e} J")
     # Part 3: Validate energy against Landauer's principle
     print("\n3. Energy Validation Against Landauer's Principle")
     print("-" * 40)
-    # Simulate measured energy from BOLD using calibrated κ_meta
+    # Simulate measured energy from BOLD using the calibrated R_L
     bold_change = 2.5  # 2.5% BOLD signal change
     bits_erased = 6.6
-    # κ_meta has units J/bit, so measured energy = κ_meta × N_bits
-    # (do NOT multiply by E_Landauer again — that double-counts the conversion)
-    measured_energy = summary["kappa_mean"] * bits_erased  # J/bit × bits = J
+    # R_L is dimensionless, so measured energy = R_L × N_erase × E_min per bit
+    measured_energy = summary["r_l_mean"] * bits_erased * summary["landauer_energy_per_bit_j"]
     # Validate
     validation = validate_energy_against_landauer(measured_energy, bits_erased)
     print(f"BOLD signal change: {bold_change:.1f}%")
@@ -97,10 +94,10 @@ def main() -> None:
     config = CONFIG.copy()
     config["use_thermodynamic_cost"] = True
     config["use_bold_calibration"] = True
-    config["r_l"] = summary["kappa_mean"]  # Use the calibrated factor (formerly κ_meta)
-    config["r_l_units"] = "joules_per_bit"
+    config["r_l"] = summary["r_l_mean"]  # calibrated R_L (formerly κ_meta)
+    config["r_l_units"] = "dimensionless"
     print("Configuration with BOLD calibration:")
-    print(f"  R_L factor: {config['r_l']:.2e} J/bit")
+    print(f"  R_L factor: {config['r_l']:.2e}")
     print(f"  units: {config['r_l_units']}")
     print(f"  BOLD conversion factor: {config['bold_conversion_factor']:.2e} J/%/cm³")
     print(f"  Ignition spike factor: {config['bold_ignition_spike_factor']:.3f}")
@@ -133,7 +130,7 @@ def main() -> None:
                 # Compute the BOLD-calibration efficiency: what fraction of E_min does
                 # the BOLD-enforced step cost represent?
                 # NOTE: C_landauer uses log2(S/eps) bits, while BOLD energy corresponds
-                # to ~0.9 bits at kappa resolution.  These differ by ~29×, so this ratio
+                # to ~0.9 bits at R_L resolution.  These differ by ~29×, so this ratio
                 # will always be << 1 and should NOT be read as a Landauer violation.
                 # The correct constraint check (Part 3 above) already confirms compliance.
                 SCALE_FACTOR = 1e20  # AU → J (matches compute_metabolic_cost_realistic)
@@ -153,9 +150,9 @@ def main() -> None:
         positive_ratios = [e for e in thermodynamic_data["efficiency"] if e > 0]
         avg_ratio = float(np.mean(positive_ratios)) if positive_ratios else 0.0
         print("\nResults:")
-        print(f"  Average Landauer cost (kappa × log2(S/eps)): {avg_cost:.2e} J")
+        print(f"  Average Landauer cost (R_L × log2(S/eps) × kT ln2): {avg_cost:.2e} J")
         print(f"  Average bits erased (log2(S/eps)):           {avg_bits:.1f}")
-        print(f"  BOLD energy / kappa×bits ratio: {avg_ratio:.3f}×")
+        print(f"  BOLD energy / Landauer cost ratio: {avg_ratio:.3f}×")
         print("  (Ratio < 1 is expected: BOLD 2% = ~0.9 bits vs log2(S/eps) ≈ 27 bits)")
         print("  See Part 3 for the correct Landauer constraint check (ratio=1020×)")
         # Validate overall: convert AU → J for the energy sum
@@ -169,8 +166,8 @@ def main() -> None:
         print(f"  Validation: {overall_validation['message']}")
     print("\n" + "=" * 60)
     print("Summary:")
-    print("  ✓ BOLD calibration converts AU to Joules per bit erased")
-    print("  ✓ κ_meta now has physical units (J/bit) instead of dimensionless")
+    print("  ✓ BOLD calibration estimates R_L, the erasure overhead over the Landauer floor")
+    print("  ✓ R_L is dimensionless; energy per bit = R_L × k_B·T·ln 2")
     print("  ✓ 5-10% energy spike during ignition events is modeled")
     print("  ✓ Direct comparison with Landauer's physical minimum enabled")
     print("=" * 60)

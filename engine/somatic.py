@@ -21,6 +21,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from core.deprecation import renamed_kwargs, warn_renamed
 from core.precision import compute_interoceptive_precision_exponential
 from core.somatic import compute_somatic_gain, update_somatic_marker_euler
 from core.threshold import (
@@ -79,7 +80,7 @@ class SomaticThresholdAdapter:
 
     Args:
         theta0: Homeostatic baseline θ₀ (also the initial threshold).
-        kappa: Relaxation rate κ ≥ 0.
+        decay_exponent: Per-step threshold decay exponent γ_θ·dt ≥ 0 (formerly ``kappa``).
         delta: Refractory boost δ ≥ 0.
         beta_sm: Somatic gain β_SM.
         tau_M: Marker time constant (same units as ``dt``).
@@ -89,10 +90,11 @@ class SomaticThresholdAdapter:
         M0: Initial marker.
     """
 
+    @renamed_kwargs(kappa="decay_exponent")
     def __init__(
         self,
         theta0: float = 0.55,
-        kappa: float = 0.15,
+        decay_exponent: float = 0.15,
         delta: float = 0.5,
         beta_sm: float = 0.3,
         tau_M: float = 500.0,
@@ -101,14 +103,14 @@ class SomaticThresholdAdapter:
         beta_5ht: float = 0.0,
         M0: float = 0.0,
     ):
-        if kappa < 0 or delta < 0:
-            raise ValueError("kappa and delta must be >= 0")
+        if decay_exponent < 0 or delta < 0:
+            raise ValueError("decay_exponent and delta must be >= 0")
         if tau_M <= 0:
             raise ValueError("tau_M must be > 0")
         if not -2.0 <= M0 <= 2.0:
             raise ValueError("M0 must lie in [-2, 2]")
         self.theta0 = theta0
-        self.kappa = kappa
+        self.decay_exponent = decay_exponent
         self.delta = delta
         self.beta_sm = beta_sm
         self.tau_M = tau_M
@@ -117,6 +119,12 @@ class SomaticThresholdAdapter:
         self.beta_5ht = beta_5ht
         self.M = M0
         self.theta = theta0
+
+    @property
+    def kappa(self) -> float:
+        """Deprecated alias of :attr:`decay_exponent` (bare κ is ATP/bit)."""
+        warn_renamed("kappa", "decay_exponent")
+        return self.decay_exponent
 
     def step(self, arousal_target: float, B: int, dt: float = 1.0) -> AdapterOutput:
         """Advance marker and threshold by one step.
@@ -129,7 +137,7 @@ class SomaticThresholdAdapter:
         if B not in (0, 1):
             raise ValueError(f"B must be 0 or 1, got {B!r}")
         self.M = update_somatic_marker_euler(self.M, arousal_target, self.tau_M, dt)
-        theta = threshold_decay(self.theta, self.theta0, self.kappa)
+        theta = threshold_decay(self.theta, self.theta0, self.decay_exponent)
         if self.gamma_ne > 0:
             theta = apply_ne_threshold_modulation(theta, self.g_ne, self.gamma_ne)
         theta = apply_refractory_boost(theta, B, self.delta)

@@ -23,9 +23,9 @@ import numpy as np
 from models.parameters import REDUCED_PARAMETER_NAMES
 from models.reduced import (
     CHANNELS,
+    DECAY_EXPONENT,
     DELTA,
     GAMMA_PHI,
-    KAPPA,
     LAM,
     RHO,
     TAU_SIGMA,
@@ -121,7 +121,7 @@ def _scan_step(x_t, b_prev, b_t, xhat, S, theta, k, pi, beta, theta_base):  # ty
     eps = x_t - xhat
     carry = 1.0 + (RHO - 1.0) * b_prev
     S_new = (1.0 - LAM) * carry * S + LAM * (pt.tanh(GAMMA_PHI * pi * pt.abs(eps)) + beta)
-    theta_next = theta_base + (theta - theta_base) * np.exp(-KAPPA) + DELTA * b_t
+    theta_next = theta_base + (theta - theta_base) * np.exp(-DECAY_EXPONENT) + DELTA * b_t
     return xhat + k * eps, S_new, theta_next, xhat, S_new, theta
 
 

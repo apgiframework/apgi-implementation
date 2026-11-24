@@ -17,6 +17,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
+from core.deprecation import warn_renamed
+
 
 class APGIConfig(BaseModel):
     """Production-grade APGI configuration with strict validation.
@@ -104,8 +106,12 @@ class APGIConfig(BaseModel):
     noise_std: float = Field(default=0.01, ge=0, description="SDE diffusion coefficient")
     # Generative model dynamics
     use_internal_predictions: bool = Field(default=True, description="Enable internal predictions")
-    kappa_e: float = Field(default=0.01, ge=0, description="Exteroceptive prediction rate")
-    kappa_i: float = Field(default=0.01, ge=0, description="Interoceptive prediction rate")
+    eta_pred_e: float = Field(
+        default=0.01, ge=0, description="Exteroceptive prediction learning rate η_pred,e"
+    )
+    eta_pred_i: float = Field(
+        default=0.01, ge=0, description="Interoceptive prediction learning rate η_pred,i"
+    )
     # Multi-scale parameters
     # NOTE: k has two distinct spec meanings that must not be conflated
     # (Notation Appendix, Cross-Series Notation Consistency table):
@@ -329,20 +335,31 @@ class APGIConfig(BaseModel):
             )
         return self
 
+    @model_validator(mode="before")
+    @classmethod
+    def rename_withdrawn_keys(cls, data: Any) -> Any:
+        """κ_e and κ_i are withdrawn (Notation Appendix); accept them for one release."""
+        if isinstance(data, dict):
+            for old, new in (("kappa_e", "eta_pred_e"), ("kappa_i", "eta_pred_i")):
+                if old in data:
+                    warn_renamed(old, new, stacklevel=5)
+                    data = {k: v for k, v in data.items() if k != old} | {new: data[old]}
+        return data
+
     @model_validator(mode="after")
     def validate_learning_rates(self) -> APGIConfig:
         """Validate generative model learning rates (Spec §1.4)."""
         if self.use_internal_predictions:
-            max_kappa = 2.0 / self.pi_max
-            if self.kappa_e >= max_kappa:
+            max_eta = 2.0 / self.pi_max
+            if self.eta_pred_e >= max_eta:
                 raise ValueError(
-                    f"kappa_e={self.kappa_e} >= {max_kappa:.4f}. "
-                    f"Spec §1.4 requires κ_e < 2/Π_max for stability."
+                    f"eta_pred_e={self.eta_pred_e} >= {max_eta:.4f}. "
+                    f"Spec §1.4 requires η_pred,e < 2/Π_max for stability."
                 )
-            if self.kappa_i >= max_kappa:
+            if self.eta_pred_i >= max_eta:
                 raise ValueError(
-                    f"kappa_i={self.kappa_i} >= {max_kappa:.4f}. "
-                    f"Spec §1.4 requires κ_i < 2/Π_max for stability."
+                    f"eta_pred_i={self.eta_pred_i} >= {max_eta:.4f}. "
+                    f"Spec §1.4 requires η_pred,i < 2/Π_max for stability."
                 )
         return self
 

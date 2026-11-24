@@ -6,7 +6,7 @@ import pytest
 from energy.bold_calibration import (
     BOLDCalibrator,
     bold_signal_to_energy,
-    calibrate_kappa_meta_from_bold,
+    calibrate_r_l_from_bold,
     compute_landauer_energy_per_bit,
     estimate_bits_from_bold_energy,
     validate_energy_against_landauer,
@@ -42,13 +42,13 @@ def test_bold_signal_to_energy():
 def test_calibrate_kappa_meta_from_bold():
     """Test κ_meta calibration from BOLD signal."""
     # Test with typical values
-    kappa = calibrate_kappa_meta_from_bold(
+    kappa = calibrate_r_l_from_bold(
         bold_signal_change=2.5,  # 2.5% BOLD change
         bits_erased=6.6,  # Typical bits for S=1.0, eps=0.01
     )
     assert kappa > 0
     # Test edge cases
-    kappa_zero = calibrate_kappa_meta_from_bold(2.5, 0.0)
+    kappa_zero = calibrate_r_l_from_bold(2.5, 0.0)
     assert kappa_zero == 0.0
     # Test that κ_meta >= Landauer minimum (at least 1x)
     e_min_per_bit = compute_landauer_energy_per_bit()
@@ -60,7 +60,7 @@ def test_estimate_bits_from_bold_energy():
     # Test round-trip: calibrate κ, then estimate bits
     bold_change = 2.5
     true_bits = 6.6
-    kappa = calibrate_kappa_meta_from_bold(bold_change, true_bits)
+    kappa = calibrate_r_l_from_bold(bold_change, true_bits)
     estimated_bits = estimate_bits_from_bold_energy(bold_change, kappa)
     # Should be close to original (within 10% due to numerical precision)
     assert np.isclose(estimated_bits, true_bits, rtol=0.1)
@@ -111,7 +111,7 @@ def test_bold_calibrator():
     summary = calibrator.get_calibration_summary()
     assert summary["calibrated"] is True
     assert summary["n_trials"] == 3
-    assert summary["kappa_mean"] > 0
+    assert summary["r_l_mean"] > 0
     assert summary["spike_factor_mean"] > 1.0  # Spike factor > 1
     # Test validation with calibrator
     validation = calibrator.validate_against_landauer(1e-20, 6.6)

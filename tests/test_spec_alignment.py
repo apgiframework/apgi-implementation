@@ -1,7 +1,7 @@
 """Alignment with APGI specification 0.3.0 (apgi-lean PD-* divergences).
 
-PD-FLOOR, PD-KAPPA-SYMBOL, PD-DT, PD-TAU-THETA, PD-TAU-S and PD-HAZARD are
-checked here from the production side; apgi-lean's test_production.py checks
+PD-FLOOR, PD-KAPPA-SYMBOL, PD-KAPPA-RESIDUAL, PD-DT, PD-TAU-THETA, PD-TAU-S,
+PD-HAZARD and PD-CLIP are checked here from the production side; apgi-lean's test_production.py checks
 the same defaults against its sha256-pinned registry.
 """
 
@@ -106,3 +106,85 @@ def test_sampler_uses_hazard_and_warns_on_legacy():
         sample_ignition_state(0.5, rng=0)
     with pytest.raises(TypeError):
         sample_ignition_state(0.5, rng=0, dt=0.01)
+
+
+def test_theta_clip_floor_is_spec_floor():
+    """PD-CLIP: the pipeline's lower θ clamp is θ_floor = 0 (Math Spec §4.5)."""
+    assert CONFIG["theta_clip_min"] == 0.0
+    assert CONFIG["theta_clip_max"] > CONFIG["theta_clip_min"]
+
+
+def test_bare_kappa_retired_from_non_atp_quantities():
+    """PD-KAPPA-RESIDUAL: no bare κ names a learning rate, decay exponent or R_L."""
+    import analysis.stability as stability
+    import core.dynamics as dynamics
+    import core.preprocessing as preprocessing
+    import energy.bold_calibration as bold
+    import models.reduced as reduced
+    from core.config_schema import APGIConfig
+    from engine.somatic import SomaticThresholdAdapter
+
+    for fn in (dynamics.update_prediction, preprocessing.update_prediction):
+        assert "eta_pred" in inspect.signature(fn).parameters
+    assert "decay_exponent" in inspect.signature(stability.compute_jacobian_discrete).parameters
+    assert "decay_exponent" in inspect.signature(SomaticThresholdAdapter).parameters
+    assert "r_l" in inspect.signature(bold.estimate_bits_from_bold_energy).parameters
+    assert "KAPPA" not in reduced.__all__ and reduced.DECAY_EXPONENT == 0.15
+    for key in ("kappa_e", "kappa_i"):
+        assert key not in CONFIG and key not in APGIConfig.model_fields
+    assert CONFIG["eta_pred_e"] < 2.0 / CONFIG["pi_max"]
+
+
+def test_residual_kappa_aliases_warn_and_agree():
+    import analysis.stability as stability
+    import energy.bold_calibration as bold
+    import models.reduced as reduced
+    from core.config_schema import APGIConfig
+    from core.dynamics import update_prediction
+    from energy.calibration_utils import calibrate_for_realistic_kappa
+    from engine.somatic import SomaticThresholdAdapter
+
+    with pytest.warns(APGIDeprecationWarning):
+        assert update_prediction(0.0, 1.0, 2.0, kappa=0.1) == update_prediction(0.0, 1.0, 2.0, 0.1)
+    with pytest.warns(APGIDeprecationWarning):
+        J = stability.compute_jacobian_discrete(0.2, kappa=0.05, c1=0.2, eta=0.1)
+    assert J[1, 1] == pytest.approx(math.exp(-0.05))
+    with pytest.warns(APGIDeprecationWarning):
+        assert SomaticThresholdAdapter(kappa=0.2).decay_exponent == 0.2
+    with pytest.warns(APGIDeprecationWarning):
+        assert SomaticThresholdAdapter(decay_exponent=0.2).kappa == 0.2
+    with pytest.warns(APGIDeprecationWarning):
+        assert reduced.KAPPA == reduced.DECAY_EXPONENT
+    with pytest.warns(APGIDeprecationWarning):
+        assert bold.calibrate_kappa_meta_from_bold(2.0, 10.0) == bold.calibrate_r_l_from_bold(
+            2.0, 10.0
+        )
+    with pytest.warns(APGIDeprecationWarning):
+        assert APGIConfig(kappa_e=0.05).eta_pred_e == 0.05
+    with pytest.warns(APGIDeprecationWarning):
+        cal = calibrate_for_realistic_kappa(target_kappa_multiple=10.0)
+    with pytest.warns(APGIDeprecationWarning):
+        assert cal["target_kappa_multiple"] == cal["target_r_l"] == 10.0
+    with pytest.warns(APGIDeprecationWarning):
+        assert config_value({"kappa_e": 0.3}, "eta_pred_e", "kappa_e", 0.01) == 0.3
+
+
+def test_renamed_result_keys_resolve_with_warning():
+    from analysis.stability import check_stability
+    from energy.bold_calibration import BOLDCalibrator
+
+    result = check_stability({"lam": 0.2, "tau_theta": 20.0, "dt": 0.01}, verbose=False)
+    constraints = result["constraints_satisfied"]
+    assert "kappa_positive" not in constraints
+    with pytest.warns(APGIDeprecationWarning):
+        assert constraints["kappa_positive"] is constraints["decay_exponent_positive"]
+    cal = BOLDCalibrator()
+    r_l = cal.calibrate_from_trial(1.0, 2.5, 6.6)
+    summary = cal.get_calibration_summary()
+    assert summary["r_l_mean"] == pytest.approx(r_l)
+    with pytest.warns(APGIDeprecationWarning):
+        assert summary.get("kappa_mean") == summary["r_l_mean"]
+    with pytest.warns(APGIDeprecationWarning):
+        assert cal.calibrated_kappa == cal.calibrated_r_l
+    with pytest.raises(KeyError):
+        summary["no_such_key"]

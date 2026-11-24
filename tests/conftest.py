@@ -235,8 +235,8 @@ def full_config() -> dict[str, Any]:
         "noise_std": 0.01,
         # Generative model dynamics
         "use_internal_predictions": True,
-        "kappa_e": 0.01,
-        "kappa_i": 0.01,
+        "eta_pred_e": 0.01,
+        "eta_pred_i": 0.01,
         # Multi-scale
         "timescale_k": 1.6,
         # Thermodynamic constraints

@@ -18,6 +18,8 @@ from typing import Any
 
 import numpy as np
 
+from core.deprecation import RenamedKeyDict, renamed_kwargs, warn_renamed
+
 # Physical constants
 K_BOLTZMANN = 1.380649e-23  # Boltzmann constant (J/K), CODATA exact value
 T_BODY = 310.0  # Body temperature (K, 37°C)
@@ -96,17 +98,19 @@ def estimate_ignition_energy_spike(
     return baseline_energy * spike_factor
 
 
-def calibrate_kappa_meta_from_bold(
+def calibrate_r_l_from_bold(
     bold_signal_change: float,
     bits_erased: float,
     T: float = T_BODY,
     conversion_factor: float = DEFAULT_BOLD_TO_ENERGY_FACTOR,
     tissue_volume: float = DEFAULT_TISSUE_VOLUME,
 ) -> float:
-    """Calibrate κ_meta (Joules per bit erased) from BOLD signal.
-    κ_meta = (Energy from BOLD) / (Landauer minimum for bits erased)
-    This converts the dimensionless κ_meta to physical units:
-    κ_meta [J/bit] = E_BOLD / (N_bits * E_min_per_bit)
+    """Estimate the Landauer erasure-consistency ratio R_L from a BOLD signal.
+    R_L = E_BOLD / (N_erase · k_B · T · ln 2)   (Notation Appendix §11)
+    R_L is dimensionless: joules divided by (bits × joules per bit). The former
+    ``calibrate_kappa_meta_from_bold`` returned the same number but labelled it
+    J/bit; κ_meta is deprecated. Because N_erase is an upper bound, R_L is a
+    lower bound on the erasure overhead.
     Args:
         bold_signal_change: BOLD signal change in percent
         bits_erased: Number of bits erased during ignition
@@ -114,7 +118,7 @@ def calibrate_kappa_meta_from_bold(
         conversion_factor: BOLD to energy conversion factor
         tissue_volume: Tissue volume
     Returns:
-        Calibrated κ_meta in Joules per bit erased
+        R_L (dimensionless)
     """
     if bits_erased <= 0:
         return 0.0
@@ -127,31 +131,36 @@ def calibrate_kappa_meta_from_bold(
     # Landauer minimum for these bits
     e_min_per_bit = compute_landauer_energy_per_bit(T)
     e_min_total = bits_erased * e_min_per_bit
-    # Calibrated κ_meta
-    kappa_calibrated = e_bold / e_min_total if e_min_total > 0 else 0.0
-    return kappa_calibrated
+    return e_bold / e_min_total if e_min_total > 0 else 0.0
 
 
+def calibrate_kappa_meta_from_bold(*args: Any, **kwargs: Any) -> float:
+    """Deprecated alias of :func:`calibrate_r_l_from_bold` (κ_meta is retired)."""
+    warn_renamed("calibrate_kappa_meta_from_bold", "calibrate_r_l_from_bold")
+    return calibrate_r_l_from_bold(*args, **kwargs)
+
+
+@renamed_kwargs(kappa_meta="r_l")
 def estimate_bits_from_bold_energy(
     bold_signal_change: float,
-    kappa_meta: float,
+    r_l: float,
     T: float = T_BODY,
     conversion_factor: float = DEFAULT_BOLD_TO_ENERGY_FACTOR,
     tissue_volume: float = DEFAULT_TISSUE_VOLUME,
 ) -> float:
-    """Estimate bits processed from BOLD signal and κ_meta.
-    Inverse of calibrate_kappa_meta_from_bold.
-    N_bits = E_BOLD / (κ_meta * E_min_per_bit)
+    """Estimate bits erased from a BOLD signal and R_L.
+    Inverse of calibrate_r_l_from_bold.
+    N_erase = E_BOLD / (R_L · E_min_per_bit)
     Args:
         bold_signal_change: BOLD signal change in percent
-        kappa_meta: Metabolic efficiency in J/bit
+        r_l: Erasure-consistency ratio R_L (dimensionless; formerly ``kappa_meta``)
         T: Temperature for Landauer calculation
         conversion_factor: BOLD to energy conversion factor
         tissue_volume: Tissue volume
     Returns:
         Estimated bits erased
     """
-    if kappa_meta <= 0:
+    if r_l <= 0:
         return 0.0
     # Energy from BOLD signal
     e_bold = bold_signal_to_energy(
@@ -162,7 +171,7 @@ def estimate_bits_from_bold_energy(
     # Landauer minimum per bit
     e_min_per_bit = compute_landauer_energy_per_bit(T)
     # Estimated bits
-    bits_estimated = e_bold / (kappa_meta * e_min_per_bit)
+    bits_estimated = e_bold / (r_l * e_min_per_bit)
     return max(bits_estimated, 0.0)
 
 
@@ -291,7 +300,7 @@ class BOLDCalibrator:
         self.ignition_spike_factor = ignition_spike_factor
         self.T = T
         # Calibration results
-        self.calibrated_kappa = None
+        self.calibrated_r_l: float | None = None
         self.calibration_data: list[dict[str, Any]] = []
 
     def calibrate_from_trial(
@@ -301,14 +310,14 @@ class BOLDCalibrator:
         estimated_bits: float,
         duration: float = 1.0,
     ) -> float:
-        """Calibrate κ_meta from a single trial with BOLD measurements.
+        """Estimate R_L from a single trial with BOLD measurements.
         Args:
             baseline_bold: Baseline BOLD signal in percent
             ignition_bold: Peak BOLD during ignition in percent
             estimated_bits: Estimated bits erased during ignition
             duration: Trial duration in seconds
         Returns:
-            Calibrated κ_meta in J/bit
+            R_L for this trial (dimensionless)
         """
         # Compute energy with ignition spike
         energy_result = compute_energy_with_ignition_spike(
@@ -318,46 +327,53 @@ class BOLDCalibrator:
             self.conversion_factor,
             self.tissue_volume,
         )
-        # Calibrate κ_meta
+        # R_L = E / (N_erase · E_min per bit), dimensionless
         total_energy = energy_result["total_energy_j"]
         if estimated_bits > 0:
-            kappa_calibrated = total_energy / (
-                estimated_bits * compute_landauer_energy_per_bit(self.T)
-            )
+            r_l = total_energy / (estimated_bits * compute_landauer_energy_per_bit(self.T))
         else:
-            kappa_calibrated = 0.0
+            r_l = 0.0
         # Store calibration data
-        calibration_record = {
-            "baseline_bold": baseline_bold,
-            "ignition_bold": ignition_bold,
-            "estimated_bits": estimated_bits,
-            "total_energy_j": total_energy,
-            "kappa_calibrated": kappa_calibrated,
-            "spike_factor": energy_result["spike_factor"],
-        }
+        calibration_record = RenamedKeyDict(
+            {
+                "baseline_bold": baseline_bold,
+                "ignition_bold": ignition_bold,
+                "estimated_bits": estimated_bits,
+                "total_energy_j": total_energy,
+                "r_l_calibrated": r_l,
+                "spike_factor": energy_result["spike_factor"],
+            },
+            {"kappa_calibrated": "r_l_calibrated"},
+        )
         self.calibration_data.append(calibration_record)
-        # Update overall calibrated κ (average)
-        if self.calibrated_kappa is None:
-            self.calibrated_kappa = kappa_calibrated
+        # Update overall calibrated R_L (average)
+        if self.calibrated_r_l is None:
+            self.calibrated_r_l = r_l
         else:
             # Weighted average based on energy magnitude
-            self.calibrated_kappa = (
-                self.calibrated_kappa * len(self.calibration_data) + kappa_calibrated
-            ) / (len(self.calibration_data) + 1)
-        return float(kappa_calibrated)
+            self.calibrated_r_l = (self.calibrated_r_l * len(self.calibration_data) + r_l) / (
+                len(self.calibration_data) + 1
+            )
+        return float(r_l)
+
+    @property
+    def calibrated_kappa(self) -> float | None:
+        """Deprecated alias of :attr:`calibrated_r_l` (κ_meta is retired)."""
+        warn_renamed("calibrated_kappa", "calibrated_r_l")
+        return self.calibrated_r_l
 
     def get_calibration_summary(self) -> dict:
         """Get summary of calibration results."""
         if not self.calibration_data:
             return {"calibrated": False, "message": "No calibration data"}
-        kappas = [d["kappa_calibrated"] for d in self.calibration_data]
+        ratios = [d["r_l_calibrated"] for d in self.calibration_data]
         energies = [d["total_energy_j"] for d in self.calibration_data]
         spike_factors = [d["spike_factor"] for d in self.calibration_data]
-        return {
+        summary = {
             "calibrated": True,
-            "kappa_mean": float(np.mean(kappas)),
-            "kappa_std": float(np.std(kappas)),
-            "kappa_median": float(np.median(kappas)),
+            "r_l_mean": float(np.mean(ratios)),
+            "r_l_std": float(np.std(ratios)),
+            "r_l_median": float(np.median(ratios)),
             "energy_mean_j": float(np.mean(energies)),
             "spike_factor_mean": float(np.mean(spike_factors)),
             "n_trials": len(self.calibration_data),
@@ -366,6 +382,10 @@ class BOLDCalibrator:
             "temperature_k": self.T,
             "landauer_energy_per_bit_j": compute_landauer_energy_per_bit(self.T),
         }
+        return RenamedKeyDict(
+            summary,
+            {"kappa_mean": "r_l_mean", "kappa_std": "r_l_std", "kappa_median": "r_l_median"},
+        )
 
     def validate_against_landauer(self, measured_energy: float, bits_erased: float) -> dict:
         """Validate measured energy against Landauer's principle using calibrated parameters."""

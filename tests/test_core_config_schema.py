@@ -131,8 +131,8 @@ class TestAPGIConfigDefaults:
         """Should have correct default prediction settings."""
         config = APGIConfig()
         assert config.use_internal_predictions is True
-        assert config.kappa_e == 0.01
-        assert config.kappa_i == 0.01
+        assert config.eta_pred_e == 0.01
+        assert config.eta_pred_i == 0.01
 
     def test_default_multiscale(self):
         """Should have correct default multiscale settings."""
@@ -381,14 +381,14 @@ class TestAPGIConfigValidation:
             APGIConfig(noise_std=-0.1)
 
     def test_kappa_e_must_be_non_negative(self):
-        """Should reject negative kappa_e."""
+        """Should reject negative eta_pred_e."""
         with pytest.raises(ValidationError):
-            APGIConfig(kappa_e=-0.1)
+            APGIConfig(eta_pred_e=-0.1)
 
     def test_kappa_i_must_be_non_negative(self):
-        """Should reject negative kappa_i."""
+        """Should reject negative eta_pred_i."""
         with pytest.raises(ValidationError):
-            APGIConfig(kappa_i=-0.1)
+            APGIConfig(eta_pred_i=-0.1)
 
     def test_timescale_k_range(self):
         """Should enforce 1 < timescale_k <= 1000 (spec canonical inter-level ratio is ~133)."""
@@ -539,17 +539,17 @@ class TestAPGIConfigModelValidators:
         assert "exceeds max" in str(exc_info.value)
 
     def test_learning_rates_validation(self):
-        """Should validate kappa_e and kappa_i against pi_max."""
+        """Should validate eta_pred_e and eta_pred_i against pi_max."""
         # Valid: kappa < 2/pi_max
-        APGIConfig(use_internal_predictions=True, pi_max=100.0, kappa_e=0.01)
-        # Invalid: kappa_e too large
+        APGIConfig(use_internal_predictions=True, pi_max=100.0, eta_pred_e=0.01)
+        # Invalid: eta_pred_e too large
         with pytest.raises(ValidationError) as exc_info:
-            APGIConfig(use_internal_predictions=True, pi_max=1.0, kappa_e=5.0)
-        assert "kappa_e" in str(exc_info.value)
-        # Invalid: kappa_i too large
+            APGIConfig(use_internal_predictions=True, pi_max=1.0, eta_pred_e=5.0)
+        assert "eta_pred_e" in str(exc_info.value)
+        # Invalid: eta_pred_i too large
         with pytest.raises(ValidationError) as exc_info:
-            APGIConfig(use_internal_predictions=True, pi_max=1.0, kappa_i=5.0)
-        assert "kappa_i" in str(exc_info.value)
+            APGIConfig(use_internal_predictions=True, pi_max=1.0, eta_pred_i=5.0)
+        assert "eta_pred_i" in str(exc_info.value)
 
     def test_somatic_bias_consistency_beta_da_precedence(self):
         """Should use beta_da when both set with different values."""
@@ -579,9 +579,11 @@ class TestAPGIConfigModelValidators:
 
     def test_learning_rates_validation_disabled(self):
         """Should skip validation when use_internal_predictions is False."""
-        config = APGIConfig(use_internal_predictions=False, pi_max=1.0, kappa_e=5.0, kappa_i=5.0)
-        assert config.kappa_e == 5.0
-        assert config.kappa_i == 5.0
+        config = APGIConfig(
+            use_internal_predictions=False, pi_max=1.0, eta_pred_e=5.0, eta_pred_i=5.0
+        )
+        assert config.eta_pred_e == 5.0
+        assert config.eta_pred_i == 5.0
 
 
 class TestAPGIConfigConversion:

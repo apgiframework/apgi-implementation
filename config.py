@@ -27,9 +27,11 @@ CONFIG = {
     # neuromodulatory gain.
     "pi_min": 0.1,
     "pi_max": 10.0,
-    # Global θ clamp (numerical stability, MathSpec §15). Externalized rather
-    # than hardcoded so sensitivity analyses can widen it explicitly.
-    "theta_clip_min": 0.1,
+    # Global θ clamp. The lower bound is the Math Spec floor θ_floor = 0 (§4.5);
+    # the spec states no other clip (apgi-lean PD-CLIP). The upper bound is a
+    # numerical guard only, not a spec quantity. Externalized so sensitivity
+    # analyses can change it explicitly.
+    "theta_clip_min": 0.0,
     "theta_clip_max": 20.0,
     # EMA variance update
     "alpha_e": 0.05,
@@ -142,8 +144,10 @@ CONFIG = {
     "noise_std": 0.01,  # SDE diffusion coefficient
     # Generative model dynamics (§1.4)
     "use_internal_predictions": True,
-    "kappa_e": 0.01,
-    "kappa_i": 0.01,
+    # Prediction learning rates η_pred,e, η_pred,i (formerly kappa_e, kappa_i;
+    # κ_e and κ_i are withdrawn, Notation Appendix). Stability: η_pred < 2/Π_max.
+    "eta_pred_e": 0.01,
+    "eta_pred_i": 0.01,
     # Multi-scale recommendation parameter
     "timescale_k": 1.6,
     # Hierarchical architecture (§8)

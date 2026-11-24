@@ -1193,13 +1193,13 @@ class APGIPipeline:
                     # Use the modulated threshold for the primary ignition level (level 0)
                     theta_next = float(thetas_mod[0])
                     self.hierarchical.thetas = thetas_mod.tolist()
-            # Global threshold clamping for stability (§15). Bounds are
-            # externalized to config so sensitivity analyses can widen them
-            # explicitly rather than editing a hardcoded literal.
+            # Global threshold clamp: lower bound θ_floor = 0 (Math Spec §4.5,
+            # apgi-lean PD-CLIP); the upper bound is a numerical guard only.
+            # Bounds are externalized to config for sensitivity analyses.
             theta_next = float(
                 np.clip(
                     theta_next,
-                    self.config.get("theta_clip_min", 0.1),
+                    self.config.get("theta_clip_min", 0.0),
                     self.config.get("theta_clip_max", 20.0),
                 )
             )
@@ -1270,14 +1270,14 @@ class APGIPipeline:
                 self.x_hat_e,
                 z_e,
                 pi_e,
-                self.config.get("kappa_e", 0.01),
+                config_value(self.config, "eta_pred_e", "kappa_e", 0.01),
                 self.config["pi_max"],
             )
             self.x_hat_i = update_prediction(
                 self.x_hat_i,
                 z_i,
                 pi_i,
-                self.config.get("kappa_i", 0.01),
+                config_value(self.config, "eta_pred_i", "kappa_i", 0.01),
                 self.config["pi_max"],
             )
         # 11) Reservoir layer update (§10) - add-on mode only

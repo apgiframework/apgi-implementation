@@ -2,7 +2,7 @@
 """
 Final BOLD Calibration Example
 Demonstrates the complete workflow for calibrating APGI energy module
-using BOLD fMRI data to produce κ_meta in Joules per bit erased.
+using BOLD fMRI data to produce an energy per bit erased (R_L × Landauer floor).
 """
 
 import os
@@ -17,7 +17,7 @@ from core.thermodynamics import (
     compute_landauer_cost,
 )
 from energy.bold_calibration import compute_landauer_energy_per_bit  # noqa: E402
-from energy.calibration_utils import calibrate_for_realistic_kappa  # noqa: E402
+from energy.calibration_utils import calibrate_for_realistic_r_l  # noqa: E402
 from pipeline import APGIPipeline  # noqa: E402
 
 
@@ -38,13 +38,13 @@ def main() -> None:
     print("\nStep 2: Calibrate Conversion Parameters")
     print("-" * 40)
     # Calibrate for typical neural efficiency (1000× Landauer)
-    calibration = calibrate_for_realistic_kappa(
-        target_kappa_multiple=1000.0,
+    calibration = calibrate_for_realistic_r_l(
+        target_r_l=1000.0,
         typical_bold_change=2.0,
         typical_bits=6.6,
     )
-    print(f"Target: κ_meta = {calibration['target_kappa_multiple']:.0f}× Landauer")
-    print(f"κ_meta = {calibration['target_kappa_j_per_bit']:.2e} J/bit")
+    print(f"Target: R_L = {calibration['target_r_l']:.0f}× Landauer")
+    print(f"Energy per bit = {calibration['target_energy_j_per_bit']:.2e} J/bit")
     print(
         f"Calibrated conversion factor: {calibration['calibrated_conversion_factor']:.2e} J/%/cm³"
     )
@@ -53,7 +53,7 @@ def main() -> None:
     config = CONFIG.copy()
     config["use_thermodynamic_cost"] = True
     config["use_bold_calibration"] = True
-    config["r_l"] = calibration["target_kappa_j_per_bit"]
+    config["r_l"] = calibration["target_energy_j_per_bit"]
     config["r_l_units"] = "joules_per_bit"
     config["bold_conversion_factor"] = calibration["calibrated_conversion_factor"]
     print("APGI Configuration with BOLD calibration:")
@@ -69,7 +69,7 @@ def main() -> None:
     print("-" * 90)
     for S in S_values:
         bits = compute_information_bits(S, eps)
-        # Legacy calculation (dimensionless κ_meta = 1.0)
+        # Legacy calculation (dimensionless R_L = 1.0)
         energy_legacy = compute_landauer_cost(S, eps, r_l=1.0, r_l_units="dimensionless")
         # BOLD-calibrated calculation
         energy_calibrated = compute_landauer_cost(
@@ -128,19 +128,19 @@ def main() -> None:
     print("=" * 70)
     print("\n✅ ACCOMPLISHED:")
     print("1. Added BOLD-to-Joule conversion module")
-    print("2. κ_meta now has physical units (J/bit) instead of dimensionless")
+    print("2. r_l can be given in physical units (J/bit) instead of as dimensionless R_L")
     print("3. Models 5-10% energy spike during ignition events")
     print("4. Enables direct comparison with Landauer's physical minimum")
     print("5. Provides empirical grounding in fMRI neuroscience")
     print("\n🔧 KEY FEATURES:")
-    print("• Two modes: dimensionless κ (legacy) or J/bit κ (calibrated)")
+    print("• Two modes: dimensionless R_L (legacy) or J/bit energy per bit (calibrated)")
     print("• BOLD calibration from fMRI data")
     print("• Energy validation against thermodynamic limits")
     print("• Configurable efficiency levels (1× to 10^6× Landauer)")
     print("\n📊 TYPICAL VALUES:")
     print(f"• Landauer minimum (310K): {e_min:.2e} J/bit")
-    print(f"• Typical neural κ_meta: {calibration['target_kappa_j_per_bit']:.2e} J/bit")
-    print(f"• Typical efficiency: {calibration['target_kappa_multiple']:.0f}× Landauer")
+    print(f"• Typical neural energy per bit: {calibration['target_energy_j_per_bit']:.2e} J/bit")
+    print(f"• Typical overhead R_L: {calibration['target_r_l']:.0f}× Landauer")
     print("\n" + "=" * 70)
 
 

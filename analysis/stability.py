@@ -15,6 +15,7 @@ from typing import Any
 
 import numpy as np
 
+from core.deprecation import RenamedKeyDict, renamed_kwargs
 from core.numerics import safe_corrcoef
 from core.phi_transform import phi_transform
 
@@ -22,23 +23,24 @@ from core.phi_transform import phi_transform
 warnings.filterwarnings("ignore", message=".*On entry to DLASCL.*")
 
 
+@renamed_kwargs(kappa="decay_exponent")
 def compute_jacobian_discrete(
     lam: float,
-    kappa: float,
+    decay_exponent: float,
     c1: float,
     eta: float,
 ) -> np.ndarray:
     """Compute Jacobian of discrete APGI system.
     At the no-ignition fixed point, the system is:
         S(t+1) = (1-λ)S(t) + λ·Π·φ(z)
-        θ(t+1) = θ(t) + η[C(t) - V(t)] + e^{-κ}(θ(t) - θ_base)
+        θ(t+1) = θ(t) + η[C(t) - V(t)] + e^{-d}(θ(t) - θ_base),  d = γ_θ·dt
     Linearizing around fixed point:
         J = [[∂S'/∂S, ∂S'/∂θ],
              [∂θ'/∂S, ∂θ'/∂θ]]
-    Spec §7.5: J = [[1-λ, 0], [ηc₁λ, e^{-κ}]]
+    Spec §7.5: J = [[1-λ, 0], [ηc₁λ, e^{-d}]]
     Args:
         lam: Signal integration rate λ ∈ (0,1)
-        kappa: Threshold decay rate κ > 0
+        decay_exponent: Per-step threshold decay exponent d = γ_θ·dt > 0 (formerly ``kappa``)
         c1: Cost coefficient c₁ > 0
         eta: Threshold learning rate η > 0
     Returns:
@@ -47,7 +49,7 @@ def compute_jacobian_discrete(
     J = np.array(
         [
             [1.0 - lam, 0.0],
-            [eta * c1 * lam, np.exp(-kappa)],
+            [eta * c1 * lam, np.exp(-decay_exponent)],
         ]
     )
     return J
@@ -90,11 +92,11 @@ def check_stability(
     lam = config.get("lam", 0.2)
     from config import decay_exponent
 
-    kappa = decay_exponent({"tau_theta": 20.0, "dt": 0.01, **config})  # γ_θ·dt = dt/τ_θ
+    d = decay_exponent({"tau_theta": 20.0, "dt": 0.01, **config})  # γ_θ·dt = dt/τ_θ
     c1 = config.get("c1", 0.2)
     eta = config.get("eta", 0.1)
     # Compute Jacobian
-    J = compute_jacobian_discrete(lam, kappa, c1, eta)
+    J = compute_jacobian_discrete(lam, d, c1, eta)
     # Compute eigenvalues
     eigs, vecs = compute_eigenvalues(J)
     # Check stability
@@ -109,7 +111,7 @@ def check_stability(
         print("=" * 60)
         print("\nParameters:")
         print(f"  λ (integration rate):     {lam:.4f}")
-        print(f"  κ (decay rate):           {kappa:.4f}")
+        print(f"  d = γ_θ·dt (decay exp.):  {d:.4f}")
         print(f"  c₁ (cost coefficient):    {c1:.4f}")
         print(f"  η (learning rate):        {eta:.4f}")
         print("\nJacobian at no-ignition fixed point:")
@@ -124,9 +126,9 @@ def check_stability(
         print(f"  Status:                   {'STABLE ✓' if stable else 'UNSTABLE ✗'}")
         print("\nConstraint Verification (Spec §7.5):")
         print(f"  λ > 0:                    {lam > 0} ✓")
-        print(f"  κ > 0:                    {kappa > 0} ✓")
+        print(f"  d > 0:                    {d > 0} ✓")
         print(f"  |λ₁| = 1-λ < 1:           {1 - lam < 1} ✓")
-        print(f"  |λ₂| = e^(-κ) < 1:        {np.exp(-kappa) < 1} ✓")
+        print(f"  |λ₂| = e^(-d) < 1:        {np.exp(-d) < 1} ✓")
         print("=" * 60 + "\n")
     return {
         "jacobian": J,
@@ -136,12 +138,15 @@ def check_stability(
         "stable": bool(stable),
         "max_eigenvalue": float(max_eig),
         "stability_margin": float(stability_margin),
-        "constraints_satisfied": {
-            "lambda_positive": bool(lam > 0),
-            "kappa_positive": bool(kappa > 0),
-            "lambda1_stable": bool(1 - lam < 1),
-            "lambda2_stable": bool(np.exp(-kappa) < 1),
-        },
+        "constraints_satisfied": RenamedKeyDict(
+            {
+                "lambda_positive": bool(lam > 0),
+                "decay_exponent_positive": bool(d > 0),
+                "lambda1_stable": bool(1 - lam < 1),
+                "lambda2_stable": bool(np.exp(-d) < 1),
+            },
+            {"kappa_positive": "decay_exponent_positive"},
+        ),
     }
 
 
@@ -189,7 +194,7 @@ def analyze_bifurcation(
     to identify bifurcation points.
     Args:
         config: Base configuration
-        param_name: Parameter to vary (e.g., "lam", "kappa")
+        param_name: Parameter to vary (e.g., "lam", "tau_theta")
         param_range: (min, max) values for parameter
         n_points: Number of points to sample
     Returns:

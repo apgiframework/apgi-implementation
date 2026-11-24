@@ -293,11 +293,11 @@ class TestEnergyModulesCoverage:
 
     def test_calibration_utils_line_124(self):
         """Test calibration_utils.py line 124 (calibration_utils edge case)."""
-        from energy.calibration_utils import calibrate_for_realistic_kappa
+        from energy.calibration_utils import calibrate_for_realistic_r_l
 
         # Test edge case
-        result = calibrate_for_realistic_kappa(
-            target_kappa_multiple=0.1,  # Edge value
+        result = calibrate_for_realistic_r_l(
+            target_r_l=0.1,  # Edge value
             typical_bold_change=1.0,
             typical_bits=6.6,
         )
@@ -305,10 +305,10 @@ class TestEnergyModulesCoverage:
 
     def test_bold_calibration_line_149(self):
         """Test bold_calibration.py line 149 (edge case)."""
-        from energy.bold_calibration import calibrate_kappa_meta_from_bold
+        from energy.bold_calibration import calibrate_r_l_from_bold
 
         # Test with zero bold change (edge case)
-        result = calibrate_kappa_meta_from_bold(
+        result = calibrate_r_l_from_bold(
             bold_signal_change=0.0,  # Edge case
             bits_erased=6.6,
         )
@@ -492,15 +492,15 @@ class TestEnergyCalibrationUtilsExtended:
 
     def test_calibration_utils_line_124(self):
         """Test calibration_utils.py line 124."""
-        from energy.calibration_utils import calibrate_for_realistic_kappa
+        from energy.calibration_utils import calibrate_for_realistic_r_l
 
         # Test with edge case parameters
-        result = calibrate_for_realistic_kappa(
-            target_kappa_multiple=500.0,  # High efficiency
+        result = calibrate_for_realistic_r_l(
+            target_r_l=500.0,  # High efficiency
             typical_bold_change=0.1,  # Low BOLD change
         )
         # Check for actual keys returned
-        assert "target_kappa_multiple" in result
+        assert "target_r_l" in result
 
 
 class TestEnergyBoldCalibrationExtended:
@@ -509,12 +509,12 @@ class TestEnergyBoldCalibrationExtended:
     def test_bold_calibration_lines_149_374_401(self):
         """Test bold_calibration.py missing lines."""
         from energy.bold_calibration import (
-            calibrate_kappa_meta_from_bold,
+            calibrate_r_l_from_bold,
             compute_landauer_energy_per_bit,
         )
 
         # Line 149: calibrate with zero bold change - returns 0.0
-        result = calibrate_kappa_meta_from_bold(
+        result = calibrate_r_l_from_bold(
             bold_signal_change=0.0,
             bits_erased=6.6,
         )
@@ -679,12 +679,12 @@ class TestCoreValidationExtended:
                 }
             )
         # Test learning rate too high with internal predictions (lines 229, 234)
-        # kappa_e=2.0 exceeds max_kappa = 2/pi_max = 2/100 = 0.02
+        # eta_pred_e=2.0 exceeds max_kappa = 2/pi_max = 2/100 = 0.02
         with pytest.raises(ValidationError):
             validate_config(
                 {
                     "use_internal_predictions": True,
-                    "kappa_e": 2.0,  # Way too high
+                    "eta_pred_e": 2.0,  # Way too high
                     "pi_max": 100.0,  # max_kappa = 2/100 = 0.02
                     "lam": 0.2,
                     "kappa": 0.15,
