@@ -15,11 +15,14 @@ The learning gain depends on α and Π only through the product ``αΠ`` — the
 structural fact that makes the pair non-separable from behaviour alone and that
 the K7a analysis tests explicitly.
 
-Fixed constants are per-trial values frozen at the pipeline defaults that
-preceded spec 0.3.0: λ = 1−exp(−dt/τ_S) with dt=0.5, τ_S=5; ρ = RHO_RETAIN;
-d = ``DECAY_EXPONENT`` (per-trial threshold decay exponent γ_θ·Δt, formerly
-``KAPPA``); δ = ``delta``; τ_σ = ``ignite_tau``. They no longer track
-``config.CONFIG``, which now integrates at dt₀ = 10 ms (apgi-lean PD-DT).
+Fixed constants are per-trial values. The model steps once per trial, not once
+per integration step, so the step rule dt ≤ min(τ)/10 does not apply to them:
+λ ≈ 0.0952 is the per-trial weight of new drive (1 − λ of S carries over to
+the next trial); ρ = RHO_RETAIN; d = ``DECAY_EXPONENT`` (per-trial threshold
+decay exponent γ_θ·Δt, formerly ``KAPPA``); δ = ``delta``; τ_σ = ``ignite_tau``.
+They are kept at the values the K7 identifiability analysis and gate table
+were run with, and do not track ``config.CONFIG``, which integrates at
+dt₀ = 10 ms (apgi-lean PD-DT, task 37).
 
 Three observation channels are available and are what the identifiability
 analysis varies:
@@ -66,8 +69,9 @@ __all__ = [
     "ApgiReduced",
 ]
 
-#: λ = 1 − exp(−dt/τ_S), dt=0.5, τ_S=5.0 (MathSpec §3).
-LAM: float = 1.0 - math.exp(-0.5 / 5.0)
+#: Per-trial weight of new drive, λ = 1 − e^(−0.1) ≈ 0.0952 (a per-trial constant, not
+#: derived from τ_S: the registered τ_S range is 0.2–0.5 s).
+LAM: float = 1.0 - math.exp(-0.1)
 #: Fraction of S retained after ignition (RHO_RETAIN, MathSpec §6.1).
 RHO: float = 0.1
 #: Per-trial threshold decay exponent d = γ_θ·Δt (formerly ``KAPPA``; bare κ is ATP/bit).

@@ -219,7 +219,7 @@ class APGIConfig(BaseModel):
     RHO_RETAIN: float = Field(default=0.1, gt=0, lt=1, description="Signal retention fraction ρ")
     DELTA_RESET: float = Field(default=0.5, ge=0, description="Post-ignition threshold boost")
     # Precision coupling ODE (hierarchical)
-    tau_pi: float = Field(default=1000.0, gt=0, description="Precision decay time constant")
+    tau_pi: float = Field(default=1000.0, gt=0, description="Precision decay time constant (s)")
     C_down: float = Field(default=0.1, ge=0, description="Top-down precision coupling strength")
     C_up: float = Field(default=0.05, ge=0, description="Bottom-up precision coupling strength")
     psi_type: Literal["identity", "tanh", "softsign"] = Field(
@@ -326,7 +326,7 @@ class APGIConfig(BaseModel):
     @model_validator(mode="after")
     def validate_dt_stability(self) -> APGIConfig:
         """Validate integration step size (Spec §7.4)."""
-        min_tau = min(self.tau_s, self.tau_theta, 1000.0)  # Default tau_pi = 1000
+        min_tau = min(self.tau_s, self.tau_theta, self.tau_pi)  # all in s
         max_dt = min_tau / 10.0
         if self.dt > max_dt:
             raise ValueError(

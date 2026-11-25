@@ -183,7 +183,7 @@ CONFIG = {
     "k_canonical": 133.0,  # Notation Appendix canonical inter-level ratio (canonical mode)
     # Precision coupling ODE (continuous-time Π cascade)
     "use_hierarchical_precision_ode": False,
-    "tau_pi": 1000.0,
+    "tau_pi": 1000.0,  # s (precision decay; v1.2 design lower bound 1 s)
     "C_down": 0.1,
     "C_up": 0.05,
     # Bottom-up nonlinear transfer ψ(ε_{ℓ-1}) in precision coupling ODE
