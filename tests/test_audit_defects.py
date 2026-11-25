@@ -699,7 +699,7 @@ class TestSci005DefaultProvenance:
         p = ReducedParams()
         for name in ("alpha", "pi", "theta_base", "beta", "sigma_r", "sigma_y"):
             assert provenance_for(name).value == getattr(p, name)
-        for const in ("LAM", "RHO", "KAPPA", "DELTA", "TAU_SIGMA", "GAMMA_PHI"):
+        for const in ("LAM", "RHO", "DECAY_EXPONENT", "DELTA", "TAU_SIGMA", "GAMMA_PHI"):
             assert provenance_for(const).value == getattr(red, const)
         cfg_rows = {r.name for r in all_defaults() if r.scope == "config.CONFIG"}
         numeric = {

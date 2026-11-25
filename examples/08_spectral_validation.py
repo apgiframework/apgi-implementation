@@ -95,7 +95,11 @@ def run_hierarchical_simulation(
     # The Lorentzian superposition model expects threshold dynamics governed
     # by the hierarchical timescales (τ_ℓ), not a separate slow timescale
     # Remove tau_theta to let hierarchical system govern dynamics naturally
-    config.pop("tau_theta", None)  # Remove any preset tau_theta
+    # Example-specific fast decay, so the hierarchy rather than a slow τ_θ governs
+    # θ: per-step exponent dt/τ_θ = 0.1 (formerly a stored 0.15), with τ_θ = 10·dt,
+    # the shortest τ_θ the step rule dt ≤ min(τ)/10 allows. Outside the canonical
+    # 10–30 s by design of this example.
+    config["tau_theta"] = 10 * config["dt"]
     config["use_continuous_threshold_ode"] = False  # Use default hierarchical dynamics
     # Initialize pipeline
     pipeline = APGIPipeline(config)

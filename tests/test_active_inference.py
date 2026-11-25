@@ -346,7 +346,7 @@ class TestPipelineActiveInference:
         """x_hat_e should be updated via the sensory feedback channel."""
         from pipeline import APGIPipeline
 
-        p = APGIPipeline(self._cfg(use_internal_predictions=True, kappa_e=0.0, kappa_i=0.0))
+        p = APGIPipeline(self._cfg(use_internal_predictions=True, eta_pred_e=0.0, eta_pred_i=0.0))
         p.step(x_e=1.0, x_i=0.5)
         # With internal predictions disabled for propagation kappa=0 and
         # active inference enabled the shift comes purely from active inference

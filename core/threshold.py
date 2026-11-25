@@ -4,6 +4,7 @@ from typing import Any
 
 import numpy as np
 
+from .deprecation import renamed_kwargs
 from .thermodynamics import K_BOLTZMANN, T_ENV_DEFAULT, compute_landauer_cost
 
 
@@ -15,6 +16,7 @@ def compute_metabolic_cost(S: float, B_prev: int = 0, c1: float = 1.0, c2: float
     return float(c1 * S + c2 * int(B_prev))
 
 
+@renamed_kwargs(kappa_meta="r_l", kappa_units="r_l_units")
 def compute_metabolic_cost_realistic(
     S: float,
     B_prev: int,
@@ -22,8 +24,8 @@ def compute_metabolic_cost_realistic(
     c2: float = 1.0,
     eps_stab: float = 1e-6,
     enforce_landauer: bool = False,
-    kappa_meta: float = 1.0,
-    kappa_units: str = "dimensionless",
+    r_l: float = 1.0,
+    r_l_units: str = "dimensionless",
     bold_calibration: dict[str, Any] | None = None,
 ) -> float:
     """C(t)=c1*S(t)+c2*B(t-1) with optional Landauer constraint (spec §11).
@@ -38,10 +40,11 @@ def compute_metabolic_cost_realistic(
         c2: Ignition cost coefficient
         eps_stab: Stability threshold for bit estimation
         enforce_landauer: Whether to enforce thermodynamic constraint
-        kappa_meta: Metabolic efficiency factor
-            - If kappa_units="dimensionless": dimensionless factor (default: 1.0)
-            - If kappa_units="joules_per_bit": energy per bit in Joules
-        kappa_units: Units of kappa_meta ("dimensionless" or "joules_per_bit")
+        r_l: Erasure-overhead factor on the Landauer floor (formerly κ_meta,
+            deprecated keyword ``kappa_meta``)
+            - If r_l_units="dimensionless": dimensionless factor (default: 1.0)
+            - If r_l_units="joules_per_bit": energy per bit in Joules
+        r_l_units: Units of r_l (deprecated keyword ``kappa_units``) ("dimensionless" or "joules_per_bit")
         bold_calibration: Optional BOLD calibration parameters dict with keys:
             - "bold_signal_change": BOLD signal change in percent
             - "conversion_factor": Joules per 1% BOLD change per cm³ tissue
@@ -72,7 +75,7 @@ def compute_metabolic_cost_realistic(
             )
             # Apply ignition spike factor; κ_meta absorbs Joules→AU unit conversion
             e_min = estimate_ignition_energy_spike(baseline_energy, spike_factor)
-            e_min_scaled = e_min * kappa_meta
+            e_min_scaled = e_min * r_l
         else:
             # Compute Landauer minimum using κ_meta (already applied inside)
             e_min_scaled = compute_landauer_cost(
@@ -80,8 +83,8 @@ def compute_metabolic_cost_realistic(
                 eps=eps_stab,
                 k_b=K_BOLTZMANN,
                 T_env=T_ENV_DEFAULT,
-                kappa_meta=kappa_meta,
-                kappa_units=kappa_units,
+                r_l=r_l,
+                r_l_units=r_l_units,
             )
         base_cost = max(base_cost, e_min_scaled)
     return float(base_cost)
@@ -112,11 +115,16 @@ def apply_ne_threshold_modulation(theta: float, g_ne: float, gamma_ne: float) ->
     return float(theta * (1.0 + gamma_ne * g_ne))
 
 
-def threshold_decay(theta: float, theta_base: float, kappa: float) -> float:
-    """θ_next = θ_base + (θ-θ_base)e^{-κ}."""
-    if kappa < 0:
-        raise ValueError("kappa must be >= 0")
-    return float(theta_base + (theta - theta_base) * np.exp(-kappa))
+@renamed_kwargs(kappa="decay_exponent")
+def threshold_decay(theta: float, theta_base: float, decay_exponent: float) -> float:
+    """Exact decay step θ_next = θ_base + (θ − θ_base)·exp(−γ_θ·dt) (Math Spec Eq. 32).
+
+    ``decay_exponent`` is γ_θ·dt = dt/τ_θ (see ``config.decay_exponent``). The
+    keyword ``kappa`` is a deprecated alias: bare κ is reserved for ATP/bit.
+    """
+    if decay_exponent < 0:
+        raise ValueError("decay_exponent must be >= 0")
+    return float(theta_base + (theta - theta_base) * np.exp(-decay_exponent))
 
 
 def update_threshold_discrete(

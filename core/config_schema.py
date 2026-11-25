@@ -17,6 +17,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
+from core.deprecation import warn_renamed
+
 
 class APGIConfig(BaseModel):
     """Production-grade APGI configuration with strict validation.
@@ -54,15 +56,21 @@ class APGIConfig(BaseModel):
     ne_on_precision: bool = Field(default=True, description="NE modulates precision")
     ne_on_threshold: bool = Field(default=False, description="NE modulates threshold")
     gamma_ne: float = Field(default=0.1, ge=0, le=1, description="NE modulation strength")
-    kappa: float = Field(default=0.15, gt=0, le=1, description="Threshold decay rate")
     # Signal accumulation
-    lam: float = Field(default=0.2, gt=0, lt=1, description="Signal integration rate")
+    lam: float = Field(
+        default=0.0327838995179941,
+        gt=0,
+        lt=1,
+        description="Signal integration rate, 1 − exp(−dt/τ_S)",
+    )
     signal_log_nonlinearity: bool = Field(default=True, description="Enable log stabilization")
     use_canonical_discrete_mode: bool = Field(
         default=False, description="Use discrete accumulation instead of ODE"
     )
     # Threshold update + refractory dynamics
-    eta: float = Field(default=0.1, gt=0, le=1, description="Threshold learning rate")
+    eta: float = Field(
+        default=0.002, gt=0, le=1, description="Threshold learning rate per step (rate × dt)"
+    )
     delta: float = Field(default=0.5, ge=0, description="Refractory boost")
     # Post-ignition signal reset
     reset_factor: float = Field(default=0.1, gt=0, lt=1, description="Signal reset factor (rho)")
@@ -90,13 +98,20 @@ class APGIConfig(BaseModel):
     )
     stochastic_ignition: bool = Field(default=False, description="Enable stochastic ignition")
     # Continuous-time parameters
-    tau_s: float = Field(default=5.0, gt=0, description="Signal decay time constant")
-    dt: float = Field(default=0.5, gt=0, description="Integration time step")
+    tau_s: float = Field(default=0.3, gt=0, description="Signal decay time constant (s)")
+    dt: float = Field(default=0.01, gt=0, description="Integration time step (s); dt₀ = 10 ms")
+    r_max: float = Field(
+        default=100.0, gt=0, description="Maximal ignition rate of the hazard (1/s)"
+    )
     noise_std: float = Field(default=0.01, ge=0, description="SDE diffusion coefficient")
     # Generative model dynamics
     use_internal_predictions: bool = Field(default=True, description="Enable internal predictions")
-    kappa_e: float = Field(default=0.01, ge=0, description="Exteroceptive prediction rate")
-    kappa_i: float = Field(default=0.01, ge=0, description="Interoceptive prediction rate")
+    eta_pred_e: float = Field(
+        default=0.01, ge=0, description="Exteroceptive prediction learning rate η_pred,e"
+    )
+    eta_pred_i: float = Field(
+        default=0.01, ge=0, description="Interoceptive prediction learning rate η_pred,i"
+    )
     # Multi-scale parameters
     # NOTE: k has two distinct spec meanings that must not be conflated
     # (Notation Appendix, Cross-Series Notation Consistency table):
@@ -118,12 +133,12 @@ class APGIConfig(BaseModel):
         default=1.380649e-23, gt=0, description="Boltzmann constant (J/K), CODATA exact value"
     )
     T_env: float = Field(default=310.0, gt=0, description="Environmental temperature (K)")
-    kappa_meta: float = Field(
+    r_l: float = Field(
         default=1e20,
         gt=0,
-        description="Metabolic efficiency factor (absorbs Joules→AU unit conversion)",
+        description="Erasure-overhead factor on the Landauer floor (formerly kappa_meta; absorbs J→AU)",
     )
-    kappa_units: Literal["dimensionless", "joules_per_bit"] = Field(
+    r_l_units: Literal["dimensionless", "joules_per_bit"] = Field(
         default="dimensionless", description="Metabolic cost units"
     )
     # BOLD calibration
@@ -304,7 +319,7 @@ class APGIConfig(BaseModel):
         if self.ne_on_threshold and self.gamma_ne >= 0.1:
             raise ValueError(
                 f"ne_on_threshold=True with gamma_ne={self.gamma_ne} causes threshold instability. "
-                "Use gamma_ne <= 0.01 or kappa >= 0.15. Spec §4.4."
+                "Use gamma_ne <= 0.01 or a faster threshold decay. Spec §4.4."
             )
         return self
 
@@ -320,20 +335,31 @@ class APGIConfig(BaseModel):
             )
         return self
 
+    @model_validator(mode="before")
+    @classmethod
+    def rename_withdrawn_keys(cls, data: Any) -> Any:
+        """κ_e and κ_i are withdrawn (Notation Appendix); accept them for one release."""
+        if isinstance(data, dict):
+            for old, new in (("kappa_e", "eta_pred_e"), ("kappa_i", "eta_pred_i")):
+                if old in data:
+                    warn_renamed(old, new, stacklevel=5)
+                    data = {k: v for k, v in data.items() if k != old} | {new: data[old]}
+        return data
+
     @model_validator(mode="after")
     def validate_learning_rates(self) -> APGIConfig:
         """Validate generative model learning rates (Spec §1.4)."""
         if self.use_internal_predictions:
-            max_kappa = 2.0 / self.pi_max
-            if self.kappa_e >= max_kappa:
+            max_eta = 2.0 / self.pi_max
+            if self.eta_pred_e >= max_eta:
                 raise ValueError(
-                    f"kappa_e={self.kappa_e} >= {max_kappa:.4f}. "
-                    f"Spec §1.4 requires κ_e < 2/Π_max for stability."
+                    f"eta_pred_e={self.eta_pred_e} >= {max_eta:.4f}. "
+                    f"Spec §1.4 requires η_pred,e < 2/Π_max for stability."
                 )
-            if self.kappa_i >= max_kappa:
+            if self.eta_pred_i >= max_eta:
                 raise ValueError(
-                    f"kappa_i={self.kappa_i} >= {max_kappa:.4f}. "
-                    f"Spec §1.4 requires κ_i < 2/Π_max for stability."
+                    f"eta_pred_i={self.eta_pred_i} >= {max_eta:.4f}. "
+                    f"Spec §1.4 requires η_pred,i < 2/Π_max for stability."
                 )
         return self
 

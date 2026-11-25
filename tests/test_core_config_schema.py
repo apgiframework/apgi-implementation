@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import pytest
 from pydantic import ValidationError
 
@@ -70,19 +72,19 @@ class TestAPGIConfigDefaults:
         assert config.ne_on_precision is True
         assert config.ne_on_threshold is False
         assert config.gamma_ne == 0.1
-        assert config.kappa == 0.15
+        assert not hasattr(config, "kappa")  # bare κ is reserved for ATP/bit
 
     def test_default_signal_accumulation(self):
         """Should have correct default signal accumulation."""
         config = APGIConfig()
-        assert config.lam == 0.2
+        assert config.lam == pytest.approx(1 - math.exp(-config.dt / config.tau_s))
         assert config.signal_log_nonlinearity is True
         assert config.use_canonical_discrete_mode is False
 
     def test_default_threshold_dynamics(self):
         """Should have correct default threshold dynamics."""
         config = APGIConfig()
-        assert config.eta == 0.1
+        assert config.eta == 0.002  # per step: 0.2 s⁻¹ × dt
         assert config.delta == 0.5
         assert config.reset_factor == 0.1
 
@@ -91,8 +93,9 @@ class TestAPGIConfigDefaults:
         config = APGIConfig()
         assert config.tau_theta == 20.0
         assert config.tau_theta_recovery == 0.45
-        assert config.tau_s == 5.0
-        assert config.dt == 0.5
+        assert config.tau_s == 0.3
+        assert config.dt == 0.01
+        assert config.r_max == 100.0
 
     def test_default_hierarchical(self):
         """Should have correct default hierarchical settings."""
@@ -128,8 +131,8 @@ class TestAPGIConfigDefaults:
         """Should have correct default prediction settings."""
         config = APGIConfig()
         assert config.use_internal_predictions is True
-        assert config.kappa_e == 0.01
-        assert config.kappa_i == 0.01
+        assert config.eta_pred_e == 0.01
+        assert config.eta_pred_i == 0.01
 
     def test_default_multiscale(self):
         """Should have correct default multiscale settings."""
@@ -142,8 +145,8 @@ class TestAPGIConfigDefaults:
         assert config.use_thermodynamic_cost is False
         assert config.k_boltzmann == 1.380649e-23
         assert config.T_env == 310.0
-        assert config.kappa_meta == 1e20
-        assert config.kappa_units == "dimensionless"
+        assert config.r_l == 1e20
+        assert config.r_l_units == "dimensionless"
 
     def test_default_bold(self):
         """Should have correct default BOLD settings."""
@@ -286,15 +289,9 @@ class TestAPGIConfigValidation:
         APGIConfig(gamma_ne=0)
         APGIConfig(gamma_ne=1.0)
 
-    def test_kappa_range(self):
-        """Should enforce 0 < kappa <= 1."""
-        with pytest.raises(ValidationError):
-            APGIConfig(kappa=0)
-        with pytest.raises(ValidationError):
-            APGIConfig(kappa=1.1)
-        with pytest.raises(ValidationError):
-            APGIConfig(kappa=-0.1)
-        APGIConfig(kappa=1.0)
+    def test_kappa_field_retired(self):
+        """The stored per-step exponent kappa is gone: τ_θ (validated > 0) replaces it."""
+        assert "kappa" not in APGIConfig.model_fields
 
     def test_lam_range(self):
         """Should enforce 0 < lam < 1."""
@@ -384,14 +381,14 @@ class TestAPGIConfigValidation:
             APGIConfig(noise_std=-0.1)
 
     def test_kappa_e_must_be_non_negative(self):
-        """Should reject negative kappa_e."""
+        """Should reject negative eta_pred_e."""
         with pytest.raises(ValidationError):
-            APGIConfig(kappa_e=-0.1)
+            APGIConfig(eta_pred_e=-0.1)
 
     def test_kappa_i_must_be_non_negative(self):
-        """Should reject negative kappa_i."""
+        """Should reject negative eta_pred_i."""
         with pytest.raises(ValidationError):
-            APGIConfig(kappa_i=-0.1)
+            APGIConfig(eta_pred_i=-0.1)
 
     def test_timescale_k_range(self):
         """Should enforce 1 < timescale_k <= 1000 (spec canonical inter-level ratio is ~133)."""
@@ -417,17 +414,17 @@ class TestAPGIConfigValidation:
         with pytest.raises(ValidationError):
             APGIConfig(T_env=0)
 
-    def test_kappa_meta_must_be_positive(self):
-        """Should reject non-positive kappa_meta."""
+    def test_r_l_must_be_positive(self):
+        """Should reject non-positive r_l (formerly kappa_meta)."""
         with pytest.raises(ValidationError):
-            APGIConfig(kappa_meta=0)
+            APGIConfig(r_l=0)
 
-    def test_kappa_units_enum(self):
-        """Should only accept valid kappa_units."""
-        APGIConfig(kappa_units="dimensionless")
-        APGIConfig(kappa_units="joules_per_bit")
+    def test_r_l_units_enum(self):
+        """Should only accept valid r_l_units (formerly kappa_units)."""
+        APGIConfig(r_l_units="dimensionless")
+        APGIConfig(r_l_units="joules_per_bit")
         with pytest.raises(ValidationError):
-            APGIConfig(kappa_units="invalid")
+            APGIConfig(r_l_units="invalid")
 
     def test_bold_conversion_factor_must_be_positive(self):
         """Should reject non-positive bold_conversion_factor."""
@@ -542,17 +539,17 @@ class TestAPGIConfigModelValidators:
         assert "exceeds max" in str(exc_info.value)
 
     def test_learning_rates_validation(self):
-        """Should validate kappa_e and kappa_i against pi_max."""
+        """Should validate eta_pred_e and eta_pred_i against pi_max."""
         # Valid: kappa < 2/pi_max
-        APGIConfig(use_internal_predictions=True, pi_max=100.0, kappa_e=0.01)
-        # Invalid: kappa_e too large
+        APGIConfig(use_internal_predictions=True, pi_max=100.0, eta_pred_e=0.01)
+        # Invalid: eta_pred_e too large
         with pytest.raises(ValidationError) as exc_info:
-            APGIConfig(use_internal_predictions=True, pi_max=1.0, kappa_e=5.0)
-        assert "kappa_e" in str(exc_info.value)
-        # Invalid: kappa_i too large
+            APGIConfig(use_internal_predictions=True, pi_max=1.0, eta_pred_e=5.0)
+        assert "eta_pred_e" in str(exc_info.value)
+        # Invalid: eta_pred_i too large
         with pytest.raises(ValidationError) as exc_info:
-            APGIConfig(use_internal_predictions=True, pi_max=1.0, kappa_i=5.0)
-        assert "kappa_i" in str(exc_info.value)
+            APGIConfig(use_internal_predictions=True, pi_max=1.0, eta_pred_i=5.0)
+        assert "eta_pred_i" in str(exc_info.value)
 
     def test_somatic_bias_consistency_beta_da_precedence(self):
         """Should use beta_da when both set with different values."""
@@ -582,9 +579,11 @@ class TestAPGIConfigModelValidators:
 
     def test_learning_rates_validation_disabled(self):
         """Should skip validation when use_internal_predictions is False."""
-        config = APGIConfig(use_internal_predictions=False, pi_max=1.0, kappa_e=5.0, kappa_i=5.0)
-        assert config.kappa_e == 5.0
-        assert config.kappa_i == 5.0
+        config = APGIConfig(
+            use_internal_predictions=False, pi_max=1.0, eta_pred_e=5.0, eta_pred_i=5.0
+        )
+        assert config.eta_pred_e == 5.0
+        assert config.eta_pred_i == 5.0
 
 
 class TestAPGIConfigConversion:

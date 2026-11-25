@@ -27,9 +27,11 @@ CONFIG = {
     # neuromodulatory gain.
     "pi_min": 0.1,
     "pi_max": 10.0,
-    # Global θ clamp (numerical stability, MathSpec §15). Externalized rather
-    # than hardcoded so sensitivity analyses can widen it explicitly.
-    "theta_clip_min": 0.1,
+    # Global θ clamp. The lower bound is the Math Spec floor θ_floor = 0 (§4.5);
+    # the spec states no other clip (apgi-lean PD-CLIP). The upper bound is a
+    # numerical guard only, not a spec quantity. Externalized so sensitivity
+    # analyses can change it explicitly.
+    "theta_clip_min": 0.0,
     "theta_clip_max": 20.0,
     # EMA variance update
     "alpha_e": 0.05,
@@ -81,8 +83,13 @@ CONFIG = {
     "ne_on_threshold": False,
     # NE modulation strength — spec constraint: γ_NE · g_NE ≤ 0.5
     "gamma_ne": 0.1,
-    # Threshold decay rate (use kappa>=0.15 when ne_on_threshold=True)
-    "kappa": 0.15,
+    # Threshold mean-reversion timescale τ_θ (s). The per-step decay exponent
+    # is γ_θ·dt = dt/τ_θ, computed by decay_exponent() below, never stored:
+    # the former per-step constant "kappa" = 0.15 at dt = 0.5 s implied
+    # τ_θ ≈ 3.3 s, outside the published 10–30 s (Math Spec p5, worked value
+    # 20 s), and bare κ is reserved for ATP/bit (Notation Appendix §11).
+    # A legacy config["kappa"] is still honoured, with a deprecation warning.
+    "tau_theta": 20.0,
     # Signal accumulation.
     # λ is the discrete leaky-integration rate. MathSpec §3 gives the EXACT
     # correspondence to the continuous form: λ = 1 − exp(−dt/τ_S); the
@@ -91,11 +98,14 @@ CONFIG = {
     # was ~2× the value its own comment ("dt/tau_s ≈ lam") claimed, so the
     # discrete and continuous formulations disagreed by a factor of two.
     # Use lam_from_tau_s() in this module to keep them consistent.
-    "lam": 0.09516258196404048,  # = 1 − exp(−dt/τ_S) for dt=0.5, τ_S=5.0
+    "lam": 0.0327838995179941,  # = lam_from_tau_s(dt=0.01, tau_s=0.3)
     "signal_log_nonlinearity": True,
     "use_canonical_discrete_mode": False,  # Use discrete leaky accumulation instead of ODE
     # Threshold update + refractory dynamics
-    "eta": 0.1,
+    # η_θ per step = continuous rate × dt (Math Spec p3: "continuous rate
+    # η_θ/dt"). 0.002 = 0.2 s⁻¹ × 0.01 s, the rate the former default (0.1
+    # per 0.5 s step) implied.
+    "eta": 0.002,
     "delta": 0.5,
     # 9) Post-ignition signal reset (§6)
     "RHO_RETAIN": 0.1,  # Matches Spec §6.1; strong reset (retains 10%, clears 90%)
@@ -118,14 +128,26 @@ CONFIG = {
     "ignite_tau": 0.5,  # Spec alias: tau_sigma
     "tau_sigma": 0.5,  # Spec-preferred name (alias for backward compatibility)
     "stochastic_ignition": False,
+    # Maximal ignition rate r_max (s⁻¹) of the dt-invariant hazard
+    # P(B=1) = 1 − exp(−r_max·Bₜ·dt) (Math Spec Eq. 35). The corpus fits it per
+    # study; 100 s⁻¹ = 1/dt₀ makes the hazard agree with the former per-step
+    # Bernoulli(Bₜ) to first order at the reference step dt₀ = 10 ms.
+    "r_max": 100.0,
     # Continuous-time signal ODE / SDE parameters
-    "tau_s": 5.0,  # Signal decay time constant (dt/tau_s ≈ lam)
-    "dt": 0.5,  # Integration time step (Spec §7.4: dt ≤ min(τ_S, τ_θ, τ_Π) / 10)
+    # τ_S = 300 ms, the worked value (Notation Appendix p2; range 200–500 ms).
+    # The former 5.0 s lay outside the published range.
+    "tau_s": 0.3,
+    # dt₀ = 10 ms, the reference step at which θ₀ and τ_σ are calibrated
+    # (Math Spec p1). Rule: dt ≤ min(τ_S, τ_θ, τ_Π)/10 (Notation Appendix p16);
+    # ≤ 1 ms when the reservoir is active (Math Spec p26).
+    "dt": 0.01,
     "noise_std": 0.01,  # SDE diffusion coefficient
     # Generative model dynamics (§1.4)
     "use_internal_predictions": True,
-    "kappa_e": 0.01,
-    "kappa_i": 0.01,
+    # Prediction learning rates η_pred,e, η_pred,i (formerly kappa_e, kappa_i;
+    # κ_e and κ_i are withdrawn, Notation Appendix). Stability: η_pred < 2/Π_max.
+    "eta_pred_e": 0.01,
+    "eta_pred_i": 0.01,
     # Multi-scale recommendation parameter
     "timescale_k": 1.6,
     # Hierarchical architecture (§8)
@@ -181,8 +203,10 @@ CONFIG = {
     "use_thermodynamic_cost": False,  # Enable Landauer's principle
     "k_boltzmann": 1.380649e-23,  # Boltzmann constant (J/K), CODATA exact value
     "T_env": 310.0,  # Environmental temperature (K, body temp)
-    "kappa_meta": 1e20,  # Metabolic efficiency factor (absorbs Joules→AU unit conversion)
-    "kappa_units": "dimensionless",  # "dimensionless" or "joules_per_bit"
+    # Erasure-overhead factor on the Landauer floor, formerly κ_meta (deprecated,
+    # Notation Appendix §11: R_L replaces κ_meta). Absorbs the Joules→AU conversion.
+    "r_l": 1e20,
+    "r_l_units": "dimensionless",  # "dimensionless" or "joules_per_bit"
     # BOLD fMRI calibration for energy conversion
     "use_bold_calibration": False,  # Enable BOLD-to-Joule conversion
     "bold_conversion_factor": 1.2e-18,  # Joules per 1% BOLD change per cm³ tissue
@@ -277,6 +301,26 @@ CONFIG = {
     # buffer. 1e6 samples ≈ 110 MB, ample for every published analysis here.
     "history_maxlen": 1_000_000,
 }
+
+
+def decay_exponent(config: dict) -> float:
+    """Per-step threshold decay exponent γ_θ·dt = dt/τ_θ (Math Spec Eq. 32).
+
+    A legacy ``config["kappa"]`` (the former stored per-step exponent) takes
+    precedence when present, since CONFIG no longer defines it, and emits an
+    :class:`APGIDeprecationWarning`.
+    """
+    from core.deprecation import warn_renamed
+
+    if "kappa" in config:  # CONFIG has no "kappa", so a present key was set explicitly
+        warn_renamed("kappa", "tau_theta (exponent = dt/tau_theta)")
+        return float(config["kappa"])
+    if "tau_theta" in config:
+        tau_theta = float(config["tau_theta"])
+        if tau_theta <= 0:
+            raise ValueError(f"tau_theta must be > 0, got {tau_theta}")
+        return float(config.get("dt", 1.0)) / tau_theta
+    raise KeyError("config needs 'tau_theta'")
 
 
 def lam_from_tau_s(dt: float, tau_s: float) -> float:

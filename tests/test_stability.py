@@ -127,7 +127,7 @@ class TestStabilityChecking:
         # All constraints should be satisfied
         constraints = result["constraints_satisfied"]
         assert constraints["lambda_positive"]
-        assert constraints["kappa_positive"]
+        assert constraints["decay_exponent_positive"]
         assert constraints["lambda1_stable"]
         assert constraints["lambda2_stable"]
 

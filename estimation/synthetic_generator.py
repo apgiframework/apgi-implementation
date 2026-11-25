@@ -32,9 +32,9 @@ import numpy as np
 
 from core.rng import RNGLike, resolve_rng
 from models.reduced import (
+    DECAY_EXPONENT,
     DELTA,
     GAMMA_PHI,
-    KAPPA,
     LAM,
     RHO,
     TAU_SIGMA,
@@ -158,7 +158,11 @@ def generate_dataset(
 
         def f(y: np.ndarray, xt: float = xt, drive: float = drive) -> np.ndarray:
             return np.array(
-                [r_x * (xt - y[0]), r_S * (drive - y[1]), -KAPPA * (y[2] - params.theta_base)]
+                [
+                    r_x * (xt - y[0]),
+                    r_S * (drive - y[1]),
+                    -DECAY_EXPONENT * (y[2] - params.theta_base),
+                ]
             )
 
         y = np.array([xhat, S0, theta])

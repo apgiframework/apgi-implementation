@@ -219,8 +219,9 @@ class TestStep9to14Accumulation:
         lam = lam_from_tau_s(CONFIG["dt"], CONFIG["tau_s"])
         assert CONFIG["lam"] == pytest.approx(lam)
         assert lam == pytest.approx(1.0 - math.exp(-CONFIG["dt"] / CONFIG["tau_s"]))
-        # And it is materially different from the naive approximation.
-        assert abs(lam - CONFIG["dt"] / CONFIG["tau_s"]) > 1e-3
+        # And it differs from the naive approximation dt/τ_S, materially at dt ~ τ_S.
+        assert abs(lam - CONFIG["dt"] / CONFIG["tau_s"]) > 1e-4
+        assert abs(lam_from_tau_s(0.5, 5.0) - 0.1) > 1e-3
 
     def test_lam_from_tau_s_rejects_non_positive(self):
         with pytest.raises(ValueError, match="dt must be > 0"):

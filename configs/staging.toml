@@ -13,9 +13,9 @@ theta_base = 0.55
 pi_min = 0.1
 pi_max = 10.0
 
-dt = 0.5
-tau_s = 5.0
-lam = 0.09516258196404048
+dt = 0.01            # dt₀ = 10 ms (Math Spec p1); dt <= min(tau_S, tau_theta, tau_Pi)/10
+tau_s = 0.3          # 300 ms worked value, range 0.2-0.5 s
+lam = 0.0327838995179941  # = 1 - exp(-dt/tau_S)
 
 psi_type = "tanh"
 gamma_psi = 2.0
@@ -32,11 +32,11 @@ use_thermodynamic_cost = true
 use_observable_mapping = true
 use_active_inference = true
 
-# kappa_meta converts the Landauer energy floor into AU. The default 1e20 makes
-# that floor (~kappa_meta * N_erase * k_B*T*ln2 ~ 5.9 AU) DOMINATE the
+# r_l (formerly kappa_meta) converts the Landauer energy floor into AU. The default 1e20 makes
+# that floor (~r_l * N_erase * k_B*T*ln2 ~ 5.9 AU) DOMINATE the
 # signal-proportional cost c1*S (~0.2 AU), so eta*[C-V] ratchets theta into its
 # clip ceiling and the reservoir/oscillator machinery never gets exercised.
 # 1e18 keeps Landauer as a genuine consistency FLOOR — which is all the spec
 # claims for it ("a thermodynamic consistency floor... not a predictive
 # constraint on metabolic cost") — while leaving the allostatic term in charge.
-kappa_meta = 1e18
+r_l = 1e18

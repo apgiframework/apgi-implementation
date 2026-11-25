@@ -8,7 +8,9 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from active_inference.policy import ActiveInferenceAgent
+from config import decay_exponent
 from core.allostatic import allostatic_threshold_ode
+from core.deprecation import config_value
 from core.dynamics import compute_precision_coupled_noise_std, update_prediction, update_signal_ode
 from core.finite import require_finite_scalar, require_optional_finite_scalar
 from core.ignition import compute_ignition_probability, detect_ignition_event, sample_ignition_state
@@ -212,14 +214,14 @@ class APGIPipeline:
         if not self.config.get("ne_on_threshold", False):
             return
         gamma_ne = float(self.config.get("gamma_ne", 0.1))
-        kappa = float(self.config.get("kappa", 0.15))
-        if gamma_ne >= 0.1 and kappa <= 0.15:
+        exponent = decay_exponent(self.config)  # γ_θ·dt = dt/τ_θ
+        if gamma_ne >= 0.1 and exponent <= 0.15:
             msg = (
-                f"ne_on_threshold=True with gamma_ne={gamma_ne} and kappa={kappa} "
-                "risks threshold instability: multiplicative NE gain can raise θ "
-                "faster than the decay relaxes it. Prefer gamma_ne <= 0.01 or "
-                "kappa >= 0.15 (§4.4). Not auto-corrected — the configuration "
-                "you pass is the configuration that runs."
+                f"ne_on_threshold=True with gamma_ne={gamma_ne} and per-step decay "
+                f"exponent dt/tau_theta={exponent:.4g} risks threshold instability: "
+                "multiplicative NE gain can raise θ faster than the decay relaxes it. "
+                "Prefer gamma_ne <= 0.01 or a faster decay (§4.4). Not auto-corrected — "
+                "the configuration you pass is the configuration that runs."
             )
             self._validation_warnings.append(msg)
             warnings.warn(msg, RuntimeWarning, stacklevel=3)
@@ -973,8 +975,8 @@ class APGIPipeline:
                 self.config["c1"],
                 self.config["c2"],
                 enforce_landauer=self.config.get("use_thermodynamic_cost", False),
-                kappa_meta=self.config.get("kappa_meta", 1e20),
-                kappa_units=self.config.get("kappa_units", "dimensionless"),
+                r_l=config_value(self.config, "r_l", "kappa_meta", 1e20),
+                r_l_units=config_value(self.config, "r_l_units", "kappa_units", "dimensionless"),
                 bold_calibration=(bold_calibration if bold_calibration is not None else {}),
             )
         else:
@@ -1002,8 +1004,8 @@ class APGIPipeline:
                 self.config["eps"],
                 k_b=self.config.get("k_boltzmann", 1.38e-23),
                 T_env=self.config.get("T_env", 310.0),
-                kappa_meta=self.config.get("kappa_meta", 1e20),
-                kappa_units=self.config.get("kappa_units", "dimensionless"),
+                r_l=config_value(self.config, "r_l", "kappa_meta", 1e20),
+                r_l_units=config_value(self.config, "r_l_units", "kappa_units", "dimensionless"),
             )
             bits_erased = compute_information_bits(self.S, self.config["eps"])
             self.history["C_landauer"].append(C_landauer)
@@ -1042,7 +1044,9 @@ class APGIPipeline:
             # Skip allostatic update - reservoir provides dynamics
             p_ignite = compute_ignition_probability(self.S, theta_next, self.config["ignite_tau"])
             if self.config["stochastic_ignition"]:
-                B_t = sample_ignition_state(p_ignite, rng=self.rng)
+                B_t = sample_ignition_state(
+                    p_ignite, rng=self.rng, dt=dt, r_max=float(self.config.get("r_max", 100.0))
+                )
             else:
                 B_t = int(detect_ignition_event(self.S, theta_next))
         else:
@@ -1065,12 +1069,13 @@ class APGIPipeline:
                 theta_next = allostatic_threshold_ode(
                     theta=self.theta,
                     theta_0=self.config["theta_base"],
-                    gamma=1.0 / self.config.get("tau_theta", 1000.0),
+                    gamma=1.0 / self.config.get("tau_theta", 20.0),
                     B_prev=_ode_B,
                     delta=_ode_delta,
                     C=C_t,
                     V=V_t,
-                    eta=self.config["eta"],
+                    # config["eta"] is per step; the ODE drift takes the rate η_θ/dt.
+                    eta=self.config["eta"] / dt,
                     dt=dt,
                     noise_std=self.config.get("noise_std", 0.01),
                     rng=self.rng,
@@ -1098,7 +1103,7 @@ class APGIPipeline:
             # extra e^{−γ_θ} and applies the NE/5-HT offsets to a threshold
             # one decay-step out of phase.
             theta_next = threshold_decay(
-                theta_next, self.config["theta_base"], self.config["kappa"]
+                theta_next, self.config["theta_base"], decay_exponent(self.config)
             )
             # 7c) Step 13 — NE multiplicative threshold modulation (§4.4).
             # g_NE has already been clamped so that γ_NE·g_NE ≤ 0.5.
@@ -1188,13 +1193,13 @@ class APGIPipeline:
                     # Use the modulated threshold for the primary ignition level (level 0)
                     theta_next = float(thetas_mod[0])
                     self.hierarchical.thetas = thetas_mod.tolist()
-            # Global threshold clamping for stability (§15). Bounds are
-            # externalized to config so sensitivity analyses can widen them
-            # explicitly rather than editing a hardcoded literal.
+            # Global threshold clamp: lower bound θ_floor = 0 (Math Spec §4.5,
+            # apgi-lean PD-CLIP); the upper bound is a numerical guard only.
+            # Bounds are externalized to config for sensitivity analyses.
             theta_next = float(
                 np.clip(
                     theta_next,
-                    self.config.get("theta_clip_min", 0.1),
+                    self.config.get("theta_clip_min", 0.0),
                     self.config.get("theta_clip_max", 20.0),
                 )
             )
@@ -1202,7 +1207,9 @@ class APGIPipeline:
             # own generator so the ignition train is reproducible from the seed.
             p_ignite = compute_ignition_probability(self.S, theta_next, self.config["ignite_tau"])
             if self.config["stochastic_ignition"]:
-                B_t = sample_ignition_state(p_ignite, rng=self.rng)
+                B_t = sample_ignition_state(
+                    p_ignite, rng=self.rng, dt=dt, r_max=float(self.config.get("r_max", 100.0))
+                )
             else:
                 B_t = int(detect_ignition_event(self.S, theta_next))
         # 8b) Compute ignition margin using pre-reset values (§14)
@@ -1263,14 +1270,14 @@ class APGIPipeline:
                 self.x_hat_e,
                 z_e,
                 pi_e,
-                self.config.get("kappa_e", 0.01),
+                config_value(self.config, "eta_pred_e", "kappa_e", 0.01),
                 self.config["pi_max"],
             )
             self.x_hat_i = update_prediction(
                 self.x_hat_i,
                 z_i,
                 pi_i,
-                self.config.get("kappa_i", 0.01),
+                config_value(self.config, "eta_pred_i", "kappa_i", 0.01),
                 self.config["pi_max"],
             )
         # 11) Reservoir layer update (§10) - add-on mode only

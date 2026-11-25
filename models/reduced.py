@@ -8,16 +8,18 @@ against the mathematical contract. Per trial ``t`` with stimulus ``x_t``:
     S_t      = (1−λ)·ρ^{B_{t−1}}·S_{t−1} + λ·drive_t   leaky accumulation, post-ignition reset
     p_t      = σ((S_t − θ_t)/τ_σ)                     ignition probability
     B_t      = Bernoulli(p_t)  |  1[S_t > θ_t]        stochastic | hard-threshold ignition
-    θ_{t+1}  = θ₀ + (θ_t − θ₀)·e^{−κ} + δ·B_t         allostatic decay + refractory boost
+    θ_{t+1}  = θ₀ + (θ_t − θ₀)·e^{−d} + δ·B_t         allostatic decay + refractory boost
     x̂_{t+1}  = x̂_t + k·ε_t,   k = αΠ/(1+αΠ)           precision-weighted learning
 
 The learning gain depends on α and Π only through the product ``αΠ`` — the
 structural fact that makes the pair non-separable from behaviour alone and that
 the K7a analysis tests explicitly.
 
-Fixed constants follow the canonical pipeline defaults (``config.CONFIG``):
-λ = 1−exp(−dt/τ_S) with dt=0.5, τ_S=5; ρ = RHO_RETAIN; κ = ``kappa``;
-δ = ``delta``; τ_σ = ``ignite_tau``.
+Fixed constants are per-trial values frozen at the pipeline defaults that
+preceded spec 0.3.0: λ = 1−exp(−dt/τ_S) with dt=0.5, τ_S=5; ρ = RHO_RETAIN;
+d = ``DECAY_EXPONENT`` (per-trial threshold decay exponent γ_θ·Δt, formerly
+``KAPPA``); δ = ``delta``; τ_σ = ``ignite_tau``. They no longer track
+``config.CONFIG``, which now integrates at dt₀ = 10 ms (apgi-lean PD-DT).
 
 Three observation channels are available and are what the identifiability
 analysis varies:
@@ -50,7 +52,7 @@ from .parameters import REDUCED_PARAMETER_NAMES, reduced_parameter_spec
 __all__ = [
     "LAM",
     "RHO",
-    "KAPPA",
+    "DECAY_EXPONENT",
     "DELTA",
     "TAU_SIGMA",
     "GAMMA_PHI",
@@ -68,8 +70,8 @@ __all__ = [
 LAM: float = 1.0 - math.exp(-0.5 / 5.0)
 #: Fraction of S retained after ignition (RHO_RETAIN, MathSpec §6.1).
 RHO: float = 0.1
-#: Threshold relaxation rate κ.
-KAPPA: float = 0.15
+#: Per-trial threshold decay exponent d = γ_θ·Δt (formerly ``KAPPA``; bare κ is ATP/bit).
+DECAY_EXPONENT: float = 0.15
 #: Refractory threshold boost δ.
 DELTA: float = 0.5
 #: Ignition sigmoid temperature τ_σ (``ignite_tau``).
@@ -79,7 +81,7 @@ GAMMA_PHI: float = 2.0
 #: Observation channels in canonical order.
 CHANNELS: tuple[str, ...] = ("behavior", "ignition", "amplitude")
 
-_EXP_NEG_KAPPA = math.exp(-KAPPA)
+_EXP_NEG_DECAY = math.exp(-DECAY_EXPONENT)
 
 
 @dataclass(frozen=True)
@@ -216,7 +218,7 @@ def reduced_step(
         if u is None:
             raise ValueError("stochastic ignition requires a uniform draw u")
         B = int(u < p)
-    theta_next = params.theta_base + (state.theta - params.theta_base) * _EXP_NEG_KAPPA + DELTA * B
+    theta_next = params.theta_base + (state.theta - params.theta_base) * _EXP_NEG_DECAY + DELTA * B
     xhat_next = state.xhat + learning_gain(params.alpha, params.pi) * eps
     record = {
         "xhat": state.xhat,
@@ -339,3 +341,13 @@ def _jsonable_bitgen_state(state: Mapping[str, Any]) -> dict[str, Any]:
         "has_uint32": int(state["has_uint32"]),
         "uinteger": int(state["uinteger"]),
     }
+
+
+def __getattr__(name: str) -> Any:
+    """``KAPPA`` stays importable for one release as an alias of ``DECAY_EXPONENT``."""
+    if name == "KAPPA":
+        from core.deprecation import warn_renamed
+
+        warn_renamed("KAPPA", "DECAY_EXPONENT")
+        return DECAY_EXPONENT
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

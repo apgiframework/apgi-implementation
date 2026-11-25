@@ -251,7 +251,7 @@ class TestPipelineHierarchicalComplete:
             "sigma2_i0": 1.0,
             "eps": 1e-8,
             "pi_min": 0.1,  # spec floor (MathSpec §2)
-            "pi_max": 10.0,  # spec ceiling (MathSpec §2); 1e4 also broke kappa_e < 2/Pi_max
+            "pi_max": 10.0,  # spec ceiling (MathSpec §2); 1e4 also broke eta_pred_e < 2/Pi_max
             "alpha_e": 0.05,
             "alpha_i": 0.05,
             "variance_method": "ema",
@@ -283,8 +283,8 @@ class TestPipelineHierarchicalComplete:
             "dt": 0.5,
             "noise_std": 0.01,
             "use_internal_predictions": True,
-            "kappa_e": 0.01,
-            "kappa_i": 0.01,
+            "eta_pred_e": 0.01,
+            "eta_pred_i": 0.01,
             "timescale_k": 1.6,
             "use_thermodynamic_cost": False,
             "use_reservoir": False,

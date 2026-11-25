@@ -28,9 +28,9 @@ from core.finite import require_finite_array
 from models.parameters import REDUCED_PARAMETER_NAMES, REDUCED_PARAMETERS
 from models.reduced import (
     CHANNELS,
+    DECAY_EXPONENT,
     DELTA,
     GAMMA_PHI,
-    KAPPA,
     LAM,
     RHO,
     TAU_SIGMA,
@@ -148,7 +148,7 @@ def log_likelihood(
     inv_sr, inv_sy = 1.0 / params.sigma_r, 1.0 / params.sigma_y
     norm_r = -(math.log(params.sigma_r) + _LOG_SQRT_2PI)
     norm_y = -(math.log(params.sigma_y) + _LOG_SQRT_2PI)
-    exp_k = math.exp(-KAPPA)
+    exp_k = math.exp(-DECAY_EXPONENT)
     one_m_lam = 1.0 - LAM
 
     xhat, S, theta, Bprev = 0.0, 0.0, th0, 0

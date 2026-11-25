@@ -25,9 +25,9 @@ import numpy as np
 
 from core.rng import RNGLike, resolve_rng
 from models.reduced import (
+    DECAY_EXPONENT,
     DELTA,
     GAMMA_PHI,
-    KAPPA,
     LAM,
     RHO,
     TAU_SIGMA,
@@ -125,7 +125,7 @@ def filter_latent_signal(
     theta = params.theta_base
     B_prev = 0
     k = learning_gain(params.alpha, params.pi)
-    exp_k = math.exp(-KAPPA)
+    exp_k = math.exp(-DECAY_EXPONENT)
     S_mean = np.empty(T)
     S_var = np.empty(T)
     ess_hist = np.empty(T)

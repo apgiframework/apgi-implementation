@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from .deprecation import renamed_kwargs
 from .rng import RNGLike, resolve_rng
 
 
@@ -53,28 +54,29 @@ def compute_precision_coupled_noise_std(pi_e_eff: float, pi_i_eff: float) -> flo
     return float(1.0 / np.sqrt(total_pi))
 
 
+@renamed_kwargs(kappa="eta_pred")
 def update_prediction(
     x_hat: float,
     epsilon: float,
     pi: float,
-    kappa: float,
+    eta_pred: float,
     pi_max: float = 100.0,
 ) -> float:
     """Generative Model Dynamics (Prediction Update) per §1.4.
-    x̂(t+1) = x̂(t) + κ · Π(t) · ε(t)
-    Stability condition: κ < 2 / Π_max ensures gradient descent convergence.
+    x̂(t+1) = x̂(t) + η_pred · Π(t) · ε(t)
+    Stability condition: η_pred < 2 / Π_max ensures gradient descent convergence.
     Args:
         x_hat: Current prediction
         epsilon: Raw prediction error (x - x_hat)
         pi: Precision (Bayesian confidence)
-        kappa: Prediction learning rate
+        eta_pred: Prediction learning rate η_pred (Notation Appendix; formerly ``kappa``)
         pi_max: Maximum precision clamp (for stability check)
     Returns:
         Updated prediction x_hat(t+1)
     """
-    # Optional stability check: κ < 2 / Π_max
+    # Optional stability check: η_pred < 2 / Π_max
     # We don't enforce it strictly here but document it.
-    return float(x_hat + kappa * pi * epsilon)
+    return float(x_hat + eta_pred * pi * epsilon)
 
 
 def update_threshold_ode(

@@ -53,8 +53,9 @@ MAPPINGS: tuple[ParameterMapping, ...] = (
     ParameterMapping(
         "α",
         "alpha",
-        "kappa_e",
-        note="Pipeline prediction update is x̂ += κ_e·Π·ε; the reduced model uses the "
+        "eta_pred_e",
+        aliases=("kappa_e",),
+        note="Pipeline prediction update is x̂ += η_pred,e·Π·ε; the reduced model uses the "
         "bounded gain k=αΠ/(1+αΠ). Same product structure, different link function.",
     ),
     ParameterMapping(
@@ -67,7 +68,7 @@ MAPPINGS: tuple[ParameterMapping, ...] = (
     ParameterMapping("θ₀", "theta_base", "theta_base", aliases=("theta_0",)),
     ParameterMapping("β_DA", "beta", "beta", aliases=("beta_da",)),
     ParameterMapping("τ_σ", None, "ignite_tau", aliases=("tau_sigma",)),
-    ParameterMapping("κ", None, "kappa"),
+    ParameterMapping("τ_θ", None, "tau_theta"),
     ParameterMapping("δ", None, "delta"),
     ParameterMapping("λ", None, "lam"),
     ParameterMapping("β_SM", None, "beta_sm", aliases=("beta_somatic",)),

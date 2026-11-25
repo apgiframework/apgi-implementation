@@ -4,6 +4,8 @@ from collections import deque
 
 import numpy as np
 
+from .deprecation import renamed_kwargs
+
 
 class RunningStats:
     """Windowed running stats used for optional normalization."""
@@ -81,18 +83,20 @@ def compute_prediction_error(x: float, x_hat: float) -> float:
     return float(x - x_hat)
 
 
-def update_prediction(x_hat: float, epsilon: float, pi: float, kappa: float) -> float:
+@renamed_kwargs(kappa="eta_pred")
+def update_prediction(x_hat: float, epsilon: float, pi: float, eta_pred: float) -> float:
     """Update prediction via precision-weighted gradient descent (§1.4).
-    x̂(t+1) = x̂(t) + κ · Π(t) · ε(t)
+    x̂(t+1) = x̂(t) + η_pred · Π(t) · ε(t)
     Args:
         x_hat: Current prediction
         epsilon: Prediction error
         pi: Precision weight
-        kappa: Learning rate (stability: κ < 2/Π_max)
+        eta_pred: Prediction learning rate η_pred (stability: η_pred < 2/Π_max;
+            formerly ``kappa``)
     Returns:
         Updated prediction x̂(t+1)
     """
-    return float(x_hat + kappa * pi * epsilon)
+    return float(x_hat + eta_pred * pi * epsilon)
 
 
 def normalize_error(z: float, sigma: float, eps: float = 1e-8) -> float:

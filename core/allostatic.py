@@ -12,7 +12,7 @@ where:
 
 The refractory boost δ·B(t) is applied as a *separate* post-ignition step
 (spec §6 / pipeline step 9), not inside this ODE, consistent with the paper.
-Backward-compatible single-η form (η·[C−V]) is preserved when kappa_meta
+Backward-compatible single-η form (η·[C−V]) is preserved when c_theta
 and delta_info are left at their None defaults.
 """
 
@@ -20,9 +20,11 @@ from __future__ import annotations
 
 import numpy as np
 
+from .deprecation import renamed_kwargs
 from .rng import RNGLike, resolve_rng
 
 
+@renamed_kwargs(kappa_meta="c_theta")
 def allostatic_threshold_ode(
     theta: float,
     theta_0: float,
@@ -34,7 +36,7 @@ def allostatic_threshold_ode(
     eta: float = 0.0,
     dt: float = 1.0,
     noise_std: float = 0.01,
-    kappa_meta: float | None = None,
+    c_theta: float | None = None,
     delta_info: float | None = None,
     ne: float = 0.0,
     eta_ne: float = 0.0,
@@ -45,7 +47,7 @@ def allostatic_threshold_ode(
     Paper §4.1.3 (Eq. 3):
         dθ/dt = −λ_θ(θ − θ₀) + κ_meta·C − Δ_info·V + η_NE·NE(t)
 
-    Backward-compatible form (when kappa_meta=None, delta_info=None):
+    Backward-compatible form (when c_theta=None, delta_info=None):
         dθ/dt = −γ_θ(θ − θ_base) + δ_reset·B(t) + η·(C − V)
 
     The δ_reset·B(t) refractory term is retained for legacy code paths
@@ -60,10 +62,11 @@ def allostatic_threshold_ode(
         delta: Refractory boost magnitude (legacy; use 0.0 for paper-spec path).
         C: Metabolic cost Cₜ.
         V: Information value Iₜ.
-        eta: Shared allostatic gain (legacy; overridden by kappa_meta/delta_info).
+        eta: Shared allostatic gain (legacy; overridden by c_theta/delta_info).
         dt: Integration time step (seconds).
         noise_std: Euler-Maruyama noise amplitude (set to 0.0 for deterministic).
-        kappa_meta: Metabolic cost gain κ_meta (paper Eq. 3). Defaults to eta.
+        c_theta: Threshold-update metabolic-cost coefficient c_θ (formerly κ_meta,
+            deprecated keyword ``kappa_meta``). Metabolic cost gain κ_meta (paper Eq. 3). Defaults to eta.
         delta_info: Information-value gain Δ_info (paper Eq. 3). Defaults to eta.
         ne: Noradrenergic signal NE(t). Zero by default.
         eta_ne: Noradrenergic coupling η_NE (paper Eq. 3).
@@ -72,11 +75,11 @@ def allostatic_threshold_ode(
     Returns:
         Updated threshold θ(t+dt).
     """
-    _kappa = kappa_meta if kappa_meta is not None else eta
+    _c_theta = c_theta if c_theta is not None else eta
     _delta_i = delta_info if delta_info is not None else eta
     mean_reversion = -gamma * (theta - theta_0)
     refractory = delta * B_prev
-    allostatic = _kappa * C - _delta_i * V
+    allostatic = _c_theta * C - _delta_i * V
     ne_term = eta_ne * ne
     drift = mean_reversion + refractory + allostatic + ne_term
     noise = float(resolve_rng(rng).normal(0.0, noise_std * np.sqrt(dt)))
@@ -87,7 +90,7 @@ def update_threshold_euler(
     theta: float,
     theta_dot: float,
     dt: float = 1.0,
-    theta_min: float = 0.1,
+    theta_min: float = 0.0,
     theta_max: float = 1e6,
 ) -> float:
     """Euler integration for threshold update.
@@ -96,7 +99,7 @@ def update_threshold_euler(
         theta: Current threshold
         theta_dot: Threshold derivative (dθ/dt)
         dt: Time step
-        theta_min: Minimum threshold (hard floor)
+        theta_min: Minimum threshold (hard floor); default θ_floor = 0 (Math Spec §4.5)
         theta_max: Maximum threshold (hard ceiling)
     Returns:
         Updated threshold

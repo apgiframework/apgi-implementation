@@ -66,7 +66,7 @@ def test_validate_config_failures():
     with pytest.raises(ValidationError, match="lam must be in"):
         check({"lam": 1.5})
     # Threshold dynamics
-    with pytest.raises(ValidationError, match="kappa must be > 0"):
+    with pytest.raises(ValidationError, match="decay exponent dt/tau_theta must be > 0"):
         check({"kappa": 0.0})
     # Ignition dynamics
     with pytest.raises(ValidationError, match="ignite_tau"):
@@ -87,14 +87,16 @@ def test_validate_config_failures():
     with pytest.raises(ValidationError, match="pi_max must be > pi_min"):
         check({"pi_max": 1.0, "pi_min": 2.0})
     # Learning rates (Stability)
-    with pytest.raises(ValidationError, match="kappa_e=1.0 >= 0.0002"):
-        check({"use_internal_predictions": True, "kappa_e": 1.0, "pi_max": 10000.0, "dt": 0.000001})
-    with pytest.raises(ValidationError, match="kappa_i=1.0 >= 0.0002"):
+    with pytest.raises(ValidationError, match="eta_pred_e=1.0 >= 0.0002"):
+        check(
+            {"use_internal_predictions": True, "eta_pred_e": 1.0, "pi_max": 10000.0, "dt": 0.000001}
+        )
+    with pytest.raises(ValidationError, match="eta_pred_i=1.0 >= 0.0002"):
         check(
             {
                 "use_internal_predictions": True,
-                "kappa_e": 0.0001,  # must be valid to reach kappa_i check
-                "kappa_i": 1.0,
+                "eta_pred_e": 0.0001,  # must be valid to reach eta_pred_i check
+                "eta_pred_i": 1.0,
                 "pi_max": 10000.0,
                 "dt": 0.000001,
             }

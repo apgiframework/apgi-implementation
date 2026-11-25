@@ -83,7 +83,7 @@ class TestCheckStability:
         config = {"lam": 0.2, "kappa": 0.15, "c1": 0.2, "eta": 0.1}
         result = check_stability(config)
         assert result["constraints_satisfied"]["lambda_positive"] is True
-        assert result["constraints_satisfied"]["kappa_positive"] is True
+        assert result["constraints_satisfied"]["decay_exponent_positive"] is True
 
     def test_verbose_output(self, capsys):
         """Should print detailed output when verbose=True."""
@@ -102,7 +102,7 @@ class TestCheckStability:
         check_stability(config, verbose=True)
         captured = capsys.readouterr()
         assert "λ (integration rate)" in captured.out
-        assert "κ (decay rate)" in captured.out
+        assert "d = γ_θ·dt (decay exp.)" in captured.out
 
     def test_verbose_shows_constraint_verification(self, capsys):
         """Verbose output should show constraint verification."""
@@ -111,7 +111,7 @@ class TestCheckStability:
         captured = capsys.readouterr()
         assert "Constraint Verification" in captured.out
         assert "λ > 0" in captured.out
-        assert "κ > 0" in captured.out
+        assert "d > 0" in captured.out
 
 
 class TestComputeFixedPoint:

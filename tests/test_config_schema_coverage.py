@@ -25,10 +25,10 @@ def test_apgi_config_validation_failures():
     with pytest.raises(ValidationError, match="exceeds max"):
         APGIConfig(dt=2.0, tau_s=5.0)
     # Learning rate stability
-    with pytest.raises(ValidationError, match="Spec §1.4 requires κ_e < 2/Π_max"):
-        APGIConfig(use_internal_predictions=True, kappa_e=1.0, pi_max=100)
-    with pytest.raises(ValidationError, match="Spec §1.4 requires κ_i < 2/Π_max"):
-        APGIConfig(use_internal_predictions=True, kappa_e=0.001, kappa_i=1.0, pi_max=100)
+    with pytest.raises(ValidationError, match="Spec §1.4 requires η_pred,e < 2/Π_max"):
+        APGIConfig(use_internal_predictions=True, eta_pred_e=1.0, pi_max=100)
+    with pytest.raises(ValidationError, match="Spec §1.4 requires η_pred,i < 2/Π_max"):
+        APGIConfig(use_internal_predictions=True, eta_pred_e=0.001, eta_pred_i=1.0, pi_max=100)
     # EMA bounds
     with pytest.raises(ValidationError, match="less than 1"):
         APGIConfig(variance_method="ema", alpha_e=1.5)

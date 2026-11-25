@@ -56,7 +56,7 @@ def test_information_value():
 def test_modulations():
     assert pytest.approx(apply_ne_threshold_modulation(1.0, 0.5, 0.2)) == 1.1
     assert pytest.approx(threshold_decay(2.0, 1.0, 1.0)) == 1.0 + (1.0 * np.exp(-1.0))
-    with pytest.raises(ValueError, match="kappa must be >= 0"):
+    with pytest.raises(ValueError, match="decay_exponent must be >= 0"):
         threshold_decay(1.0, 1.0, -1.0)
     assert pytest.approx(apply_serotonin_threshold_offset(1.0, 0.5)) == 1.5
     assert pytest.approx(apply_refractory_boost(1.0, 1, 0.5)) == 1.5

@@ -2,15 +2,15 @@
 APGI Specification §11: Thermodynamic Constraints
 This module implements the connection between information processing and
 thermodynamic cost via Landauer's principle:
-    E_min = κ_meta · N_erase · k_B · T_env · ln(2)
+    E_min = R_L · N_erase · k_B · T_env · ln(2)
 where:
     - N_erase ≈ log₂(S / ε_stab) is the number of bits erased
     - k_B is Boltzmann's constant (1.38e-23 J/K)
     - T_env is environmental temperature (typically 310 K for biological systems)
-    - κ_meta is a metabolic efficiency factor (typically 1.0-2.0)
+    - R_L is a metabolic efficiency factor (typically 1.0-2.0)
     - ln(2) ≈ 0.693 is the natural log of 2
 The metabolic cost C(t) must satisfy:
-    C(t) ≥ κ_meta · N_erase(t) · k_B · T_env · ln(2)
+    C(t) ≥ R_L · N_erase(t) · k_B · T_env · ln(2)
 This grounds the APGI metabolic cost model in fundamental thermodynamics.
 References:
     - Landauer, R. (1961). "Irreversibility and Heat Generation in the Computing Process"
@@ -22,35 +22,38 @@ from __future__ import annotations
 
 import numpy as np
 
+from .deprecation import renamed_kwargs
+
 # Physical constants
 K_BOLTZMANN = 1.380649e-23  # Boltzmann constant (J/K), CODATA exact value
 T_ENV_DEFAULT = 310.0  # Body temperature (K)
 LN2 = np.log(2.0)  # Natural log of 2
 
 
+@renamed_kwargs(kappa_meta="r_l", kappa_units="r_l_units")
 def compute_landauer_cost(
     S: float,
     eps: float,
     k_b: float = K_BOLTZMANN,
     T_env: float = T_ENV_DEFAULT,
-    kappa_meta: float = 1.0,
-    kappa_units: str = "dimensionless",
+    r_l: float = 1.0,
+    r_l_units: str = "dimensionless",
 ) -> float:
     """Compute thermodynamic cost per Landauer's principle.
     Implements APGI Spec §11: Connection to Metabolic Cost
     Two modes of operation:
-    1. Dimensionless κ_meta (legacy): E_min = κ_meta · N_erase · k_B · T_env · ln(2)
-    2. Calibrated κ_meta in J/bit: E_min = κ_meta · N_erase
+    1. Dimensionless R_L (legacy): E_min = R_L · N_erase · k_B · T_env · ln(2)
+    2. Calibrated R_L in J/bit: E_min = R_L · N_erase
     where N_erase ≈ log₂(S / ε_stab) is the number of bits erased.
     Args:
         S: Signal magnitude (bits of information)
         eps: Stability threshold ε_stab (minimum detectable signal)
         k_b: Boltzmann constant (default: 1.38e-23 J/K)
         T_env: Environmental temperature (default: 310 K for body)
-        kappa_meta: Metabolic efficiency factor
-            - If kappa_units="dimensionless": dimensionless factor (default: 1.0)
-            - If kappa_units="joules_per_bit": energy per bit in Joules
-        kappa_units: Units of kappa_meta ("dimensionless" or "joules_per_bit")
+        r_l: Metabolic efficiency factor
+            - If r_l_units="dimensionless": dimensionless factor (default: 1.0)
+            - If r_l_units="joules_per_bit": energy per bit in Joules
+        r_l_units: Units of r_l ("dimensionless" or "joules_per_bit")
     Returns:
         Minimum thermodynamic cost E_min (in Joules)
     Raises:
@@ -63,8 +66,8 @@ def compute_landauer_cost(
         >>> # With calibrated κ in J/bit (e.g., from BOLD fMRI)
         >>> kappa_calibrated = 3.21e-21  # J/bit (Landauer minimum at body temp)
         >>> cost = compute_landauer_cost(S=1.0, eps=0.01,
-        ...                              kappa_meta=kappa_calibrated,
-        ...                              kappa_units="joules_per_bit")
+        ...                              r_l=kappa_calibrated,
+        ...                              r_l_units="joules_per_bit")
         >>> print(f"Cost: {cost:.2e} J")
         Cost: 3.21e-21 J
     """
@@ -77,30 +80,26 @@ def compute_landauer_cost(
         raise ValueError(f"k_b must be > 0, got {k_b}")
     if T_env <= 0:
         raise ValueError(f"T_env must be > 0, got {T_env}")
-    if kappa_meta <= 0:
-        raise ValueError(f"kappa_meta must be > 0, got {kappa_meta}")
-    if kappa_units not in ["dimensionless", "joules_per_bit"]:
-        raise ValueError(
-            f"kappa_units must be 'dimensionless' or 'joules_per_bit', got {kappa_units}"
-        )
+    if r_l <= 0:
+        raise ValueError(f"r_l must be > 0, got {r_l}")
+    if r_l_units not in ["dimensionless", "joules_per_bit"]:
+        raise ValueError(f"r_l_units must be 'dimensionless' or 'joules_per_bit', got {r_l_units}")
     # Number of bits erased: N_erase = log₂(S / ε_stab)
     n_erase = np.log2(S / eps)
-    if kappa_units == "dimensionless":
-        # Legacy mode: κ_meta is dimensionless efficiency factor
-        e_min = kappa_meta * n_erase * k_b * T_env * LN2
-    else:  # joules_per_bit
-        # Calibrated mode: κ_meta is energy per bit in Joules
-        e_min = kappa_meta * n_erase
+    # dimensionless: r_l scales the Landauer floor k_B·T·ln2 per bit;
+    # joules_per_bit: r_l is itself the calibrated energy per bit in Joules.
+    e_min = r_l * n_erase * k_b * T_env * LN2 if r_l_units == "dimensionless" else r_l * n_erase
     return float(e_min)
 
 
+@renamed_kwargs(kappa_meta="r_l", kappa_units="r_l_units")
 def compute_landauer_cost_batch(
     S_array: np.ndarray,
     eps: float,
     k_b: float = K_BOLTZMANN,
     T_env: float = T_ENV_DEFAULT,
-    kappa_meta: float = 1.0,
-    kappa_units: str = "dimensionless",
+    r_l: float = 1.0,
+    r_l_units: str = "dimensionless",
 ) -> np.ndarray:
     """Compute Landauer cost for a batch of signal values.
     Vectorized version of compute_landauer_cost for efficiency.
@@ -109,8 +108,8 @@ def compute_landauer_cost_batch(
         eps: Stability threshold
         k_b: Boltzmann constant
         T_env: Environmental temperature
-        kappa_meta: Metabolic efficiency factor
-        kappa_units: Units of kappa_meta ("dimensionless" or "joules_per_bit")
+        r_l: Metabolic efficiency factor
+        r_l_units: Units of r_l ("dimensionless" or "joules_per_bit")
     Returns:
         Array of costs with same shape as S_array
     Examples:
@@ -124,20 +123,21 @@ def compute_landauer_cost_batch(
     # Vectorized computation
     mask = S_array > eps
     n_erase = np.log2(S_array[mask] / eps)
-    if kappa_units == "dimensionless":
-        costs[mask] = kappa_meta * n_erase * k_b * T_env * LN2
+    if r_l_units == "dimensionless":
+        costs[mask] = r_l * n_erase * k_b * T_env * LN2
     else:  # joules_per_bit
-        costs[mask] = kappa_meta * n_erase
+        costs[mask] = r_l * n_erase
     return costs
 
 
+@renamed_kwargs(kappa_meta="r_l", kappa_units="r_l_units")
 def validate_thermodynamic_constraint(
     C_metabolic: float,
     S: float,
     eps: float,
     k_b: float = K_BOLTZMANN,
     T_env: float = T_ENV_DEFAULT,
-    kappa_meta: float = 1.0,
+    r_l: float = 1.0,
     tolerance: float = 0.01,
 ) -> dict:
     """Validate that metabolic cost satisfies Landauer's principle.
@@ -148,7 +148,7 @@ def validate_thermodynamic_constraint(
         eps: Stability threshold
         k_b: Boltzmann constant
         T_env: Environmental temperature
-        kappa_meta: Metabolic efficiency factor
+        r_l: Metabolic efficiency factor
         tolerance: Relative tolerance for constraint (default: 1%)
     Returns:
         Dictionary with validation results:
@@ -167,7 +167,7 @@ def validate_thermodynamic_constraint(
         >>> print(f"Ratio: {result['ratio']:.2f}")
         Ratio: 3.12
     """
-    e_min = compute_landauer_cost(S, eps, k_b, T_env, kappa_meta)
+    e_min = compute_landauer_cost(S, eps, k_b, T_env, r_l)
     if e_min == 0:
         # No information to erase
         return {
@@ -225,9 +225,9 @@ def compute_metabolic_efficiency(
     k_b: float = K_BOLTZMANN,
     T_env: float = T_ENV_DEFAULT,
 ) -> float:
-    """Compute metabolic efficiency factor κ_meta from observed cost.
-    Inverse of compute_landauer_cost: given C, S, ε, compute κ_meta.
-    κ_meta = C / (N_erase · k_B · T_env · ln(2))
+    """Compute metabolic efficiency factor R_L from observed cost.
+    Inverse of compute_landauer_cost: given C, S, ε, compute R_L (formerly κ_meta).
+    R_L = C / (N_erase · k_B · T_env · ln(2))
     Args:
         C_metabolic: Observed metabolic cost
         S: Signal magnitude
@@ -235,16 +235,16 @@ def compute_metabolic_efficiency(
         k_b: Boltzmann constant
         T_env: Environmental temperature
     Returns:
-        Metabolic efficiency factor κ_meta
+        Metabolic efficiency factor R_L
     Raises:
         ValueError: If S ≤ eps (no information to erase)
     Examples:
-        >>> # If cost is 2x Landauer minimum, κ_meta = 2.0
+        >>> # If cost is 2x Landauer minimum, R_L = 2.0
         >>> kappa = compute_metabolic_efficiency(
         ...     C_metabolic=2e-20, S=1.0, eps=0.01
         ... )
-        >>> print(f"κ_meta: {kappa:.2f}")
-        κ_meta: 2.00
+        >>> print(f"R_L: {kappa:.2f}")
+        R_L: 2.00
     """
     if eps >= S:
         raise ValueError(f"S must be > eps for information content (S={S}, eps={eps})")
@@ -256,21 +256,22 @@ def compute_metabolic_efficiency(
     return float(kappa_meta)
 
 
+@renamed_kwargs(kappa_meta="r_l", kappa_units="r_l_units")
 def estimate_temperature_from_cost(
     C_metabolic: float,
     S: float,
     eps: float,
-    kappa_meta: float = 1.0,
+    r_l: float = 1.0,
     k_b: float = K_BOLTZMANN,
 ) -> float:
     """Estimate environmental temperature from observed metabolic cost.
-    Inverse of compute_landauer_cost: given C, S, ε, κ_meta, compute T_env.
-    T_env = C / (κ_meta · N_erase · k_B · ln(2))
+    Inverse of compute_landauer_cost: given C, S, ε, R_L, compute T_env.
+    T_env = C / (R_L · N_erase · k_B · ln(2))
     Args:
         C_metabolic: Observed metabolic cost
         S: Signal magnitude
         eps: Stability threshold
-        kappa_meta: Metabolic efficiency factor
+        r_l: Metabolic efficiency factor
         k_b: Boltzmann constant
     Returns:
         Estimated environmental temperature (K)
@@ -287,19 +288,20 @@ def estimate_temperature_from_cost(
     if eps >= S:
         raise ValueError(f"S must be > eps (S={S}, eps={eps})")
     n_erase = np.log2(S / eps)
-    denominator = kappa_meta * n_erase * k_b * LN2
+    denominator = r_l * n_erase * k_b * LN2
     if denominator == 0:
         raise ValueError("Denominator is zero (invalid parameters)")
     T_env = C_metabolic / denominator
     return float(T_env)
 
 
+@renamed_kwargs(kappa_meta="r_l", kappa_units="r_l_units")
 def thermodynamic_cost_trajectory(
     S_history: np.ndarray,
     eps: float,
     k_b: float = K_BOLTZMANN,
     T_env: float = T_ENV_DEFAULT,
-    kappa_meta: float = 1.0,
+    r_l: float = 1.0,
 ) -> dict:
     """Analyze thermodynamic cost over a trajectory.
     Args:
@@ -307,7 +309,7 @@ def thermodynamic_cost_trajectory(
         eps: Stability threshold
         k_b: Boltzmann constant
         T_env: Environmental temperature
-        kappa_meta: Metabolic efficiency factor
+        r_l: Metabolic efficiency factor
     Returns:
         Dictionary with trajectory statistics:
             - costs: array of costs at each time step
@@ -323,7 +325,7 @@ def thermodynamic_cost_trajectory(
         >>> print(f"Total bits: {result['total_bits']:.1f}")
     """
     S_history = np.asarray(S_history)
-    costs = compute_landauer_cost_batch(S_history, eps, k_b, T_env, kappa_meta)
+    costs = compute_landauer_cost_batch(S_history, eps, k_b, T_env, r_l)
     bits = np.array([compute_information_bits(s, eps) for s in S_history])
     return {
         "costs": costs,

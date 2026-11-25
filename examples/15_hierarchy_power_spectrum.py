@@ -31,6 +31,7 @@ def main() -> None:
     config["n_levels"] = 5
     config["k"] = 1.6  # Timescale separation
     config["dt"] = 0.05
+    config["tau_s"] = 5.0  # example-specific slow accumulation; dt ≤ τ_S/10 must hold
     config["tau_0"] = 10.0  # Set explicitly to avoid warning and meet Spec §8.2
     pipeline = APGIPipeline(config)
     n_steps = 10000

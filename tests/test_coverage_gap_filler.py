@@ -10,7 +10,7 @@ from core.validation import (
     validate_config,
     validate_parameter,
 )
-from energy.bold_calibration import BOLDCalibrator, calibrate_kappa_meta_from_bold
+from energy.bold_calibration import BOLDCalibrator, calibrate_r_l_from_bold
 from energy.calibration_utils import demonstrate_calibration_range
 from hierarchy.coupling import (
     HierarchicalPrecisionNetwork,
@@ -94,11 +94,11 @@ def test_core_validation_gaps():
     # pi_max <= pi_min
     with pytest.raises(ValidationError, match="pi_max must be > pi_min"):
         validate_config({**base_cfg, "pi_min": 100, "pi_max": 50})
-    # kappa_i >= max_kappa
+    # eta_pred_i >= max_kappa
     # max_kappa = 2 / pi_max. If pi_max=100, max_kappa=0.02.
-    with pytest.raises(ValidationError, match="kappa_i="):
+    with pytest.raises(ValidationError, match="eta_pred_i="):
         validate_config(
-            {**base_cfg, "use_internal_predictions": True, "pi_max": 100, "kappa_i": 1.0}
+            {**base_cfg, "use_internal_predictions": True, "pi_max": 100, "eta_pred_i": 1.0}
         )
     # alpha_e/i errors
     with pytest.raises(ValidationError, match="alpha_e="):
@@ -154,8 +154,8 @@ def test_energy_bold_gaps():
     # BOLDCalibrator summary BEFORE calibration
     cal = BOLDCalibrator()
     assert cal.get_calibration_summary() == {"calibrated": False, "message": "No calibration data"}
-    # calibrate_kappa_meta_from_bold with bits_erased=0
-    assert calibrate_kappa_meta_from_bold(1.0, 0.0) == 0.0
+    # calibrate_r_l_from_bold with bits_erased=0
+    assert calibrate_r_l_from_bold(1.0, 0.0) == 0.0
     # BOLDCalibrator with estimated_bits=0
     assert cal.calibrate_from_trial(1.0, 1.1, 0.0) == 0.0
     # demonstrate_calibration_range

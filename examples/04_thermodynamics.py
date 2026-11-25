@@ -35,7 +35,7 @@ def main() -> None:
     print(
         f"     - Environment temperature: {float(config['T_env']):.1f} K ({float(config['T_env']) - 273:.1f}°C)"  # type: ignore[arg-type]
     )
-    print(f"     - Metabolic efficiency: {float(config['kappa_meta']):.2f}")  # type: ignore[arg-type]
+    print(f"     - Erasure-overhead factor R_L: {float(config['r_l']):.2f}")  # type: ignore[arg-type]
     print("     - Cost model: C(t) = c1 * S(t) (simple linear)")
     # Initialize pipeline
     print("\n2. Initializing APGI pipeline...")
@@ -67,7 +67,7 @@ def main() -> None:
             eps=float(config["eps"]),  # type: ignore[arg-type]
             k_b=float(config["k_boltzmann"]),  # type: ignore[arg-type]
             T_env=float(config["T_env"]),  # type: ignore[arg-type]
-            kappa_meta=float(config["kappa_meta"]),  # type: ignore[arg-type]
+            r_l=float(config["r_l"]),  # type: ignore[arg-type]
         )
         thermodynamic_data["landauer_cost"].append(landauer)
         # Compute information bits

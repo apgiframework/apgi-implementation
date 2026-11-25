@@ -17,6 +17,8 @@ from __future__ import annotations
 import warnings
 from typing import TYPE_CHECKING, Any
 
+from core.deprecation import config_value
+
 if TYPE_CHECKING:
     from core.logging_config import get_logger
 
@@ -182,10 +184,13 @@ def _validate_threshold_dynamics(config: dict) -> None:
     Spec §4.5: Exponential decay rate κ must be > 0
     Spec §6.1: Reset factor ρ must be in (0, 1) - validated at step() time
     """
-    kappa = config.get("kappa", 0.15)
-    if kappa <= 0:
+    from config import decay_exponent
+
+    exponent = decay_exponent({"tau_theta": 20.0, "dt": 0.01, **config})
+    if exponent <= 0:
         raise ValidationError(
-            f"kappa must be > 0, got {kappa}. Spec §4.5: θ(t+1) = θ_base + (θ(t) - θ_base)·exp(-κ)"
+            f"decay exponent dt/tau_theta must be > 0, got {exponent}. "
+            "Spec Eq. 32: θ(t+1) = θ_base + (θ(t) − θ_base)·exp(−γ_θ·dt)"
         )
 
 
@@ -281,26 +286,26 @@ def _validate_precision_parameters(config: dict) -> None:
 
 def _validate_learning_rates(config: dict) -> None:
     """Validate generative model learning rates (Spec §1.4).
-    Spec §1.4: Learning rates κ_e, κ_i must satisfy κ < 2/Π_max
+    Spec §1.4: Learning rates η_pred,e, η_pred,i must satisfy η_pred < 2/Π_max
     for gradient descent convergence in the generative model.
     """
     if not config.get("use_internal_predictions", False):
         return  # Skip if generative model disabled
-    kappa_e = config.get("kappa_e", 0.01)
-    kappa_i = config.get("kappa_i", 0.01)
+    eta_pred_e = config_value(config, "eta_pred_e", "kappa_e", 0.01)
+    eta_pred_i = config_value(config, "eta_pred_i", "kappa_i", 0.01)
     pi_max = config.get("pi_max", 10.0)
-    max_kappa = 2.0 / pi_max
-    if kappa_e >= max_kappa:
+    max_eta = 2.0 / pi_max
+    if eta_pred_e >= max_eta:
         raise ValidationError(
-            f"kappa_e={kappa_e} >= {max_kappa:.4f}. "
-            f"Spec §1.4 requires κ_e < 2/Π_max for generative model stability. "
-            f"Current Π_max={pi_max}, max allowed κ_e={max_kappa:.4f}"
+            f"eta_pred_e={eta_pred_e} >= {max_eta:.4f}. "
+            f"Spec §1.4 requires η_pred,e < 2/Π_max for generative model stability. "
+            f"Current Π_max={pi_max}, max allowed η_pred,e={max_eta:.4f}"
         )
-    if kappa_i >= max_kappa:
+    if eta_pred_i >= max_eta:
         raise ValidationError(
-            f"kappa_i={kappa_i} >= {max_kappa:.4f}. "
-            f"Spec §1.4 requires κ_i < 2/Π_max for generative model stability. "
-            f"Current Π_max={pi_max}, max allowed κ_i={max_kappa:.4f}"
+            f"eta_pred_i={eta_pred_i} >= {max_eta:.4f}. "
+            f"Spec §1.4 requires η_pred,i < 2/Π_max for generative model stability. "
+            f"Current Π_max={pi_max}, max allowed η_pred,i={max_eta:.4f}"
         )
 
 

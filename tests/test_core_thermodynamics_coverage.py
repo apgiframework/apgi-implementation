@@ -31,9 +31,9 @@ def test_compute_landauer_cost():
         compute_landauer_cost(1.0, 0.01, k_b=0.0)
     with pytest.raises(ValueError, match="T_env must be > 0"):
         compute_landauer_cost(1.0, 0.01, T_env=0.0)
-    with pytest.raises(ValueError, match="kappa_meta must be > 0"):
+    with pytest.raises(ValueError, match="r_l must be > 0"):
         compute_landauer_cost(1.0, 0.01, kappa_meta=0.0)
-    with pytest.raises(ValueError, match="kappa_units must be"):
+    with pytest.raises(ValueError, match="r_l_units must be"):
         compute_landauer_cost(1.0, 0.01, kappa_units="invalid")
 
 
