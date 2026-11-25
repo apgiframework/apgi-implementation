@@ -52,8 +52,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--points", type=int, default=100, help="K7a plausible-range sweep points")
     ap.add_argument("--starts", type=int, default=16, help="K7a multi-start searches")
     ap.add_argument("--estimator", choices=("laplace", "mcmc"), default="mcmc")
-    ap.add_argument("--draws", type=int, default=1000, help="MCMC draws per chain")
-    ap.add_argument("--warmup", type=int, default=600, help="MCMC warm-up per chain")
+    ap.add_argument("--draws", type=int, default=3000, help="MCMC draws per chain")
+    ap.add_argument("--warmup", type=int, default=1500, help="MCMC warm-up per chain")
     ap.add_argument("--seed", type=int, default=20261116)
     args = ap.parse_args(argv)
 
