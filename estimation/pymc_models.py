@@ -93,7 +93,11 @@ def build_pymc_model(
         # PyTensor >= 2.37 deprecates the (outputs, updates) return of scan and will return the
         # outputs only; return_updates=False selects that form where it exists (F11). This
         # scan has no shared-variable updates, so nothing is dropped.
-        scan_kw = {"return_updates": False} if "return_updates" in inspect.signature(pytensor.scan).parameters else {}
+        scan_kw = (
+            {"return_updates": False}
+            if "return_updates" in inspect.signature(pytensor.scan).parameters
+            else {}
+        )
         scanned = pytensor.scan(
             fn=_scan_step,
             sequences=[pt.as_tensor_variable(a) for a in (x, B_prev, B)],

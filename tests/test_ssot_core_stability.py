@@ -7,6 +7,7 @@ Overflow, NaN and division by zero have defined handling:
 * division by zero cannot occur: constant input drives σ_ref and Σ to 0 and every
   denominator stays ≥ ε_stab (apgi-lean: Apgi.traj_denoms_pos).
 """
+
 from __future__ import annotations
 
 import copy
@@ -16,16 +17,16 @@ import warnings
 
 import pytest
 
-import config as PCFG
+import config as pcfg
 from core.finite import NonFiniteInputError, NonFiniteStateError
 
 
 def _pipe():
-    import pipeline as PP
+    import pipeline as pp
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        p = PP.APGIPipeline(copy.deepcopy(PCFG.CONFIG))
+        p = pp.APGIPipeline(copy.deepcopy(pcfg.CONFIG))
     assert p.model_form == "ssot_core"
     import numpy as np
 
@@ -79,6 +80,16 @@ def test_constant_input_has_no_division_by_zero():
     p = _pipe()
     for _ in range(3000):
         r = p.step(1.0, 1.0)
-    for key in ("S", "S_inst", "theta", "theta_eff", "B_prop", "pi_e", "pi_i", "z_e_norm", "z_i_norm"):
+    for key in (
+        "S",
+        "S_inst",
+        "theta",
+        "theta_eff",
+        "B_prop",
+        "pi_e",
+        "pi_i",
+        "z_e_norm",
+        "z_i_norm",
+    ):
         assert math.isfinite(float(r[key])), key
-    assert r["pi_e"] == pytest.approx(float(PCFG.CONFIG.get("pi_max", 10.0)))
+    assert r["pi_e"] == pytest.approx(float(pcfg.CONFIG.get("pi_max", 10.0)))

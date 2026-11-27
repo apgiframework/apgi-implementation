@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
@@ -139,7 +140,7 @@ class PrecisionWeightedErrorChannel:
 def precision_weighted_errors(
     x: Sequence[float] | np.ndarray,
     x_hat: Sequence[float] | np.ndarray,
-    **channel_kwargs: float,
+    **channel_kwargs: Any,
 ) -> dict[str, np.ndarray]:
     """Vectorised driver: run a fresh channel over paired sequences.
 
