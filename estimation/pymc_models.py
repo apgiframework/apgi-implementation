@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import inspect
 from collections.abc import Sequence
 from typing import Any
 
@@ -89,13 +90,19 @@ def build_pymc_model(
         beta = pm.Deterministic("beta", p[3])
         k = alpha * pi / (1.0 + alpha * pi)
 
-        outs, _updates = pytensor.scan(
+        # PyTensor >= 2.37 deprecates the (outputs, updates) return of scan and will return the
+        # outputs only; return_updates=False selects that form where it exists (F11). This
+        # scan has no shared-variable updates, so nothing is dropped.
+        scan_kw = {"return_updates": False} if "return_updates" in inspect.signature(pytensor.scan).parameters else {}
+        scanned = pytensor.scan(
             fn=_scan_step,
             sequences=[pt.as_tensor_variable(a) for a in (x, B_prev, B)],
             outputs_info=[pt.zeros(()), pt.zeros(()), theta_base, None, None, None],
             non_sequences=[k, pi, beta, theta_base],
             n_steps=int(x.shape[0]),
+            **scan_kw,
         )
+        outs = scanned if scan_kw else scanned[0]
         xhat_pre, S_seq, theta_pre = outs[3], outs[4], outs[5]
         terms = []
         if "behavior" in ch:

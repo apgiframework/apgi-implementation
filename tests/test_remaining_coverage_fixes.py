@@ -258,7 +258,7 @@ class TestExamples16FiguresRemaining:
         assert os.path.exists(file_path)
 
         # Try to read and parse the file
-        with open(file_path) as f:
+        with open(file_path, encoding="utf-8") as f:  # not the platform default (cp1252 on Windows)
             content = f.read()
             # Basic syntax check
             assert "import" in content
