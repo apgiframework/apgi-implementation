@@ -25,6 +25,8 @@ from __future__ import annotations
 import math
 from collections import deque
 
+from core.finite import NonFiniteStateError
+
 M0 = math.sqrt(2.0 / math.pi)  # m₀ = E|z| for z ~ N(0, 1) (Lean: Apgi.meanAbsStdNormal_eq)
 NE_BOUND = 0.5
 
@@ -78,8 +80,52 @@ class SSOTCore:
         return mu, math.sqrt(sum((w - mu) ** 2 for w in window) / n)
 
 
+def _rng_state(rng):
+    bg = getattr(rng, "bit_generator", None)
+    return None if bg is None else bg.state
+
+
+def _restore_rng(rng, state) -> None:
+    if state is not None:
+        rng.bit_generator.state = state
+
+
 def step(pipe, x_e: float, x_i: float, x_hat_e: float | None = None, x_hat_i: float | None = None) -> dict:
-    """One canonical timestep on an APGIPipeline instance `pipe` (SSOT §8)."""
+    """One canonical timestep on an APGIPipeline instance `pipe` (SSOT §8).
+
+    TC-13 (SSOT §23): the step is computed into locals and committed only if every new state
+    value is finite. An overflow (OverflowError, or a non-finite result from finite inputs)
+    raises NonFiniteStateError and leaves the pipeline, its RNG and its history unchanged: the
+    same atomic contract APGIPipeline.step gives non-finite inputs (AUD-DEF-01). Division by
+    zero cannot occur: every denominator is σ_ref + ε_stab or Σ + ε_stab with σ_ref, Σ ≥ 0
+    (apgi-lean: Apgi.traj_denoms_pos).
+    """
+    rng_state = _rng_state(pipe.rng)
+    try:
+        new, B, out = _compute(pipe, x_e, x_i, x_hat_e, x_hat_i)
+    except OverflowError as exc:
+        _restore_rng(pipe.rng, rng_state)
+        raise NonFiniteStateError(f"ssot_core step overflowed: {exc}") from exc
+    bad = sorted(k for k, v in new.items() if not math.isfinite(v))
+    if bad:
+        _restore_rng(pipe.rng, rng_state)
+        raise NonFiniteStateError("ssot_core step would leave a non-finite state: " + ", ".join(bad))
+    st, core = pipe.state, pipe._ssot                                                 # commit
+    core.r, core.t_ep = new["r"], new["t_ep"]
+    st.mu_e, st.mu_i, st.sigma2_e, st.sigma2_i = new["mu_e"], new["mu_i"], new["sigma2_e"], new["sigma2_i"]
+    core.ref_e.append(new["eps_e"])
+    core.ref_i.append(new["eps_i"])
+    pipe.x_hat_e, pipe.x_hat_i = new["x_hat_e"], new["x_hat_i"]
+    pipe.S, pipe.theta, pipe.B_prev = new["S"], new["theta"], B                       # 15
+    pipe.t += new["dt"]
+    pipe.history["S"].append(new["S"])
+    pipe.history["theta"].append(new["theta"])
+    pipe.history["B"].append(float(B))
+    return out
+
+
+def _compute(pipe, x_e, x_i, x_hat_e, x_hat_i) -> tuple[dict, int, dict]:
+    """Steps 2-15 into locals; nothing on `pipe` is mutated except the RNG draw (restored on failure)."""
     cfg, st, core = pipe.config, pipe.state, pipe._ssot
     eps_stab, dt = float(cfg.get("eps", 1e-8)), float(cfg.get("dt", 0.01))
     pi_min, pi_max = float(cfg.get("pi_min", 0.1)), float(cfg.get("pi_max", 10.0))
@@ -127,41 +173,38 @@ def step(pipe, x_e: float, x_i: float, x_hat_e: float | None = None, x_hat_i: fl
     pre = theta + float(cfg.get("eta", 0.0)) * (C - V) + float(cfg.get("delta", 0.0)) * B
     theta_next = max(float(cfg.get("theta_clip_min", 0.0)),
                      theta0 + (pre - theta0) * math.exp(-dt / float(cfg.get("tau_theta", 20.0))))
-    core.r = core.r * math.exp(-dt / float(cfg.get("tau_ref", 0.3))) + float(cfg.get("delta_ref", 0.0)) * B  # 11
+    r_next = core.r * math.exp(-dt / float(cfg.get("tau_ref", 0.3))) + float(cfg.get("delta_ref", 0.0)) * B  # 11
     S_at_ignition = S
     if B:                                                                             # 12
         S = rho * S
-        core.t_ep = 0.0
+        t_ep = 0.0
     else:
-        core.t_ep += dt
+        t_ep = core.t_ep + dt
     lam = float(cfg["lam"]) if "lam" in cfg else -math.expm1(-dt / float(cfg.get("tau_s", 0.3)))
     S = (1.0 - lam) * S + lam * s_inst                                                # 13
     a_e = float(cfg["alpha_e"]) if "alpha_e" in cfg else ema_alpha(dt, float(cfg.get("T_window_e", 5.0)))  # 14
     a_i = float(cfg["alpha_i"]) if "alpha_i" in cfg else ema_alpha(dt, float(cfg.get("T_window_i", 10.0)))
     mu_e0, mu_i0 = st.mu_e, st.mu_i
-    st.mu_e = (1 - a_e) * mu_e0 + a_e * eps_e
-    st.mu_i = (1 - a_i) * mu_i0 + a_i * eps_i
-    st.sigma2_e = (1 - a_e) * st.sigma2_e + a_e * (eps_e - mu_e0) ** 2
-    st.sigma2_i = (1 - a_i) * st.sigma2_i + a_i * (eps_i - mu_i0) ** 2
-    core.ref_e.append(eps_e)
-    core.ref_i.append(eps_i)
+    mu_e = (1 - a_e) * mu_e0 + a_e * eps_e
+    mu_i = (1 - a_i) * mu_i0 + a_i * eps_i
+    s2_e = (1 - a_e) * st.sigma2_e + a_e * (eps_e - mu_e0) ** 2
+    s2_i = (1 - a_i) * st.sigma2_i + a_i * (eps_i - mu_i0) ** 2
+    xhat_e, xhat_i = pipe.x_hat_e, pipe.x_hat_i
     if cfg.get("use_internal_predictions", True) and x_hat_e is None:
-        pipe.x_hat_e += float(cfg.get("eta_pred_e", 0.0)) * pi_e * eps_e
+        xhat_e = xhat_e + float(cfg.get("eta_pred_e", 0.0)) * pi_e * eps_e
     if cfg.get("use_internal_predictions", True) and x_hat_i is None:
-        pipe.x_hat_i += float(cfg.get("eta_pred_i", 0.0)) * pi_i * eps_i
-    pipe.S, pipe.theta, pipe.B_prev = S, theta_next, B                                # 15
-    pipe.t += dt
-    pipe.history["S"].append(S)
-    pipe.history["theta"].append(theta_next)
-    pipe.history["B"].append(float(B))
-    return {
+        xhat_i = xhat_i + float(cfg.get("eta_pred_i", 0.0)) * pi_i * eps_i
+    new = {"S": S, "theta": theta_next, "r": r_next, "t_ep": t_ep, "mu_e": mu_e, "mu_i": mu_i,
+           "sigma2_e": s2_e, "sigma2_i": s2_i, "eps_e": eps_e, "eps_i": eps_i,
+           "x_hat_e": xhat_e, "x_hat_i": xhat_i, "dt": dt}
+    return new, B, {
         "model_form": "ssot_core",
         "z_e": eps_e, "z_i": eps_i, "z_e_norm": z_e, "z_i_norm": z_i, "z_i_eff": z_i_eff,
-        "mu_e": st.mu_e, "mu_i": st.mu_i, "pi_e": pi_e, "pi_i": pi_i,
+        "mu_e": mu_e, "mu_i": mu_i, "pi_e": pi_e, "pi_i": pi_i,
         "pi_e_eff": pi_e_eff, "pi_i_eff": pi_i_eff, "pi_rel_e": pr_e, "pi_rel_i": pr_i,
         "S_inst": s_inst, "S": S, "S_decided": S_at_ignition, "C": C, "V": V,
-        "theta": theta_next, "theta_decided": theta, "theta_eff": theta_eff, "r_refractory": core.r,
+        "theta": theta_next, "theta_decided": theta, "theta_eff": theta_eff, "r_refractory": r_next,
         "ignition_margin": margin, "B_prop": b_prop, "p_ignite": p_hit, "B": B, "theta_dot": 0.0,
-        "x_hat_e": pipe.x_hat_e, "x_hat_i": pipe.x_hat_i, "M_somatic": M,
+        "x_hat_e": xhat_e, "x_hat_i": xhat_i, "M_somatic": M,
         "metabolic_state": getattr(pipe, "metabolic_state", None),
     }

@@ -22,6 +22,7 @@ import numpy as np
 
 __all__ = [
     "NonFiniteInputError",
+    "NonFiniteStateError",
     "require_finite_scalar",
     "require_optional_finite_scalar",
     "require_finite_array",
@@ -31,6 +32,15 @@ __all__ = [
 
 class NonFiniteInputError(ValueError):
     """A caller-supplied value is NaN, infinite, non-numeric or of the wrong shape."""
+
+
+class NonFiniteStateError(OverflowError):
+    """A model step would leave a non-finite state (overflow) from finite inputs.
+
+    SSOT §23 TC-13: overflow has defined handling. The step that raises this is
+    rejected atomically: no state, statistics, RNG or history changes. It subclasses
+    :class:`OverflowError`, so existing ``except OverflowError`` handlers keep working.
+    """
 
 
 def require_finite_scalar(name: str, value: Any) -> float:
