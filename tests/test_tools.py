@@ -54,6 +54,25 @@ def test_run_k7_end_to_end_writes_every_artifact(tmp_path):
     assert manifest["k7a_sha256"] == table["meta"]["k7a_sha256"]
 
 
+def test_run_k7_records_git_state_before_writing_outputs(tmp_path, monkeypatch):
+    """F21: the manifest's git state is read before any output exists, so a run into the
+    repository's own gates/ is not marked dirty by its own untracked result files."""
+    seen: list[bool] = []
+
+    def fake_git_revision():
+        seen.append((tmp_path / "k7a-results.json").exists())
+        return {"commit": "c0ffee", "dirty": False, "branch": "main"}
+
+    monkeypatch.setattr(run_k7, "git_revision", fake_git_revision)
+    args = ["--subjects", "4", "--points", "6", "--starts", "2", "--estimator", "laplace"]
+    assert run_k7.main(["--out", str(tmp_path), *args, "--seed", "3"]) == 0
+    assert seen and seen[0] is False, "git state read after outputs were written"
+    manifest = json.loads((tmp_path / "k7-manifest.json").read_text())
+    assert manifest["git"] == {"commit": "c0ffee", "dirty": False, "branch": "main"}
+    table = json.loads((tmp_path / "gate-table.json").read_text())
+    assert table["meta"]["git_commit"] == "c0ffee"
+
+
 def test_run_k7_is_seed_reproducible(tmp_path):
     args = [
         "--subjects",

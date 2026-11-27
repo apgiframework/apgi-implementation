@@ -26,7 +26,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from core.manifest import build_manifest  # noqa: E402
+from core.manifest import build_manifest, git_revision  # noqa: E402
 from estimation.gate_table import build_gate_table, write_gate_table  # noqa: E402
 from estimation.recovery_simulation import run_recovery  # noqa: E402
 from estimation.structural_identifiability import AnalysisSetup, run_k7a  # noqa: E402
@@ -57,6 +57,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--seed", type=int, default=20261116)
     args = ap.parse_args(argv)
 
+    # The code state is recorded before any output is written: outputs land inside the
+    # repository (gates/), and `git status --porcelain` counts them as untracked files, so
+    # reading the state at the end marked every run "dirty" because of its own results.
+    git_at_start = git_revision()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
@@ -91,6 +95,7 @@ def main(argv: list[str] | None = None) -> int:
             "k7a_sha256": _digest(k7a),
             "k7c_sha256": _digest({k: v.as_dict() for k, v in k7c_runs.items()}),
             "elapsed_s": round(time.time() - t0, 1),
+            "git": git_at_start,
         },
     )
     table = build_gate_table(
