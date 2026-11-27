@@ -1,24 +1,24 @@
 {
   "dev": {
     "config": "configs/dev.toml",
-    "digest": "85d176742bd643ddea607fff28a764fec4bab30e9061fdad6edeff82a479a12f",
-    "final_S": 0.047773592,
-    "final_theta": 0.661691828,
-    "ignition_count": 1.0,
+    "digest": "d627e86abecae46384c85e5f65d7e76e570eb862312296301349de9a94ee1c81",
+    "final_S": 0.120422967,
+    "final_theta": 1.750823195,
+    "ignition_count": 4.0,
     "steps": 200
   },
   "prod": {
     "config": "configs/prod.toml",
-    "digest": "dc452446726477a86dd031f8cbe6f204f59015cad84d7b06cc4b1988a3d96e95",
-    "final_S": 0.022813597,
-    "final_theta": 2.496170314,
-    "ignition_count": 5.0,
+    "digest": "969eb5db16e1c0cb75e1b51dd45ded5f6b38c9ec30ceef0899a60a3ca7bd0dcd",
+    "final_S": 0.131108886,
+    "final_theta": 3.129748842,
+    "ignition_count": 7.0,
     "steps": 200
   },
   "staging": {
     "config": "configs/staging.toml",
-    "digest": "09e1841749bcfd264904796a93b136b3531eaac1699a1539bbbcf4cbb835dd41",
-    "final_S": 0.166683717,
+    "digest": "882823e83242b2f6dc71d0218b7f5bb5a1bb1ff73eeabac064c87cd66805d60e",
+    "final_S": 0.025627082,
     "final_theta": 20.0,
     "ignition_count": 1.0,
     "steps": 100

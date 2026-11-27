@@ -72,7 +72,7 @@ class TestNumericalParity:
     def test_error_channel_matches_pipeline(self):
         cfg = {**CONFIG, "seed": 1, "use_internal_predictions": False}
         pipe = APGIPipeline(cfg)
-        ch = PrecisionWeightedErrorChannel(cfg["alpha_e"], cfg["pi_min"], cfg["pi_max"], cfg["eps"])
+        ch = PrecisionWeightedErrorChannel(cfg["alpha_e"], cfg["pi_min"], cfg["pi_max"], cfg["eps"], reference_window=round(cfg["T_window_e"] / cfg["dt"]))
         rng = np.random.default_rng(0)
         for x, h in zip(rng.normal(size=60), rng.normal(size=60), strict=True):
             r = pipe.step(float(x), 0.0, float(h), 0.0)

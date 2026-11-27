@@ -52,7 +52,7 @@ class TestPipelineSerotonin:
             eps_e = float(rng.normal(0, 0.5))
             eps_i = float(rng.normal(0, 0.5))
             result = pipe.step(eps_e, eps_i)
-            thetas.append(result["theta"])
+            thetas.append(result["theta_eff"] if "theta_eff" in result else result["theta"])
         return thetas
 
     def test_positive_5ht_raises_threshold_vs_zero(self):

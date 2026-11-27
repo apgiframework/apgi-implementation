@@ -42,7 +42,8 @@ class TestPredictionError:
         cfg = {**CONFIG, "seed": 1, "use_internal_predictions": False}
         pipe = APGIPipeline(cfg)
         ch = PrecisionWeightedErrorChannel(
-            alpha=cfg["alpha_e"], pi_min=cfg["pi_min"], pi_max=cfg["pi_max"], eps=cfg["eps"]
+            alpha=cfg["alpha_e"], pi_min=cfg["pi_min"], pi_max=cfg["pi_max"], eps=cfg["eps"],
+            reference_window=round(cfg["T_window_e"] / cfg["dt"]),
         )
         rng = np.random.default_rng(0)
         xs, hats = rng.normal(0, 1, 80), rng.normal(0, 0.5, 80)

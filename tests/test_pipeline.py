@@ -1131,9 +1131,9 @@ class TestRealisticCost:
 
     def test_realistic_cost_vs_simple(self, base_config):
         """Test realistic cost differs from simple cost."""
-        config_realistic = base_config.copy()
+        config_realistic = {**base_config, "model_form": "legacy_v1_1"}  # v1.1 cost model
         config_realistic["use_realistic_cost"] = True
-        config_simple = base_config.copy()
+        config_simple = {**base_config, "model_form": "legacy_v1_1"}
         config_simple["use_realistic_cost"] = False
         pipeline_r = APGIPipeline(config_realistic)
         pipeline_s = APGIPipeline(config_simple)

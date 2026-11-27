@@ -8,8 +8,8 @@
 seed = 0            # fixed for debuggability; change freely
 strict = true       # keep spec violations loud even in dev
 
-theta_0 = 0.55
-theta_base = 0.55
+theta_0 = 0.35
+theta_base = 0.35
 pi_min = 0.1
 pi_max = 10.0
 

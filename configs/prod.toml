@@ -12,8 +12,8 @@ seed = 20260729
 strict = true
 
 # --- Canonical core parameters (Notation Appendix, Canonical Parameters) ---
-theta_0 = 0.55      # canonical [0.25, 0.85] AU
-theta_base = 0.55
+theta_0 = 0.35      # canonical [0.25, 0.85] AU
+theta_base = 0.35
 pi_min = 0.1        # MathSpec §2 precision clamp
 pi_max = 10.0
 tau_sigma = 0.5     # gamma_sig = 1/tau_sigma = 2.0, canonical [2, 7.5]

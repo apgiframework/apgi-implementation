@@ -81,7 +81,12 @@ class PrecisionWeightedErrorChannel:
         alpha_minus: float = 1.0,
         gamma_plus: float = 2.0,
         gamma_minus: float = 2.0,
+        reference_window: int | None = None,
     ):
+        """``reference_window`` (samples) selects the APGI v1.2 minimal-core order (SSOT §8):
+        z is standardized against a sliding reference window that excludes the current error
+        (EQ-STD-1), and the returned Π is computed from the variance BEFORE the current error
+        enters it (step 4). ``None`` keeps the v1.1 decomposition (one shared estimator)."""
         if not 0.0 < alpha <= 1.0:
             raise ValueError(f"alpha must be in (0, 1], got {alpha}")
         if not 0.0 < pi_min <= pi_max:
@@ -94,16 +99,32 @@ class PrecisionWeightedErrorChannel:
         self.sigma2 = sigma2_0
         self._phi = (alpha_plus, alpha_minus, gamma_plus, gamma_minus)
         self.pi = compute_precision(sigma2_0, eps, pi_min, pi_max)
+        self.reference_window = reference_window
+        self._ref: list[float] = []
 
     def update(self, x: float, x_hat: float) -> PredictionErrorResult:
         """Process one observation against its prediction."""
         z = compute_prediction_error(x, x_hat)
-        z_norm = (z - self.mu) / (self.sigma2**0.5 + self.eps)
+        if self.reference_window is None:
+            z_norm = (z - self.mu) / (self.sigma2**0.5 + self.eps)
+        else:
+            n = len(self._ref)
+            if n < 2:
+                m_ref, s_ref = 0.0, 1.0
+            else:
+                m_ref = sum(self._ref) / n
+                s_ref = (sum((w - m_ref) ** 2 for w in self._ref) / n) ** 0.5
+            z_norm = (z - m_ref) / (s_ref + self.eps)
+            self.pi = compute_precision(self.sigma2, self.eps, self.pi_min, self.pi_max)
         phi = phi_transform(z_norm, *self._phi)
         mu_prev = self.mu
         self.mu = update_mean_ema(self.mu, z, self.alpha)
         self.sigma2 = (1.0 - self.alpha) * self.sigma2 + self.alpha * (z - mu_prev) ** 2
-        self.pi = compute_precision(self.sigma2, self.eps, self.pi_min, self.pi_max)
+        if self.reference_window is None:
+            self.pi = compute_precision(self.sigma2, self.eps, self.pi_min, self.pi_max)
+        else:
+            self._ref.append(z)
+            del self._ref[: -max(2, self.reference_window)]
         return PredictionErrorResult(
             eps=z,
             z_norm=z_norm,

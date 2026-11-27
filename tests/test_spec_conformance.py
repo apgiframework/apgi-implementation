@@ -75,7 +75,7 @@ class TestStep1to3Preprocessing:
         MathSpec §1: "omitting Step 1 produces a second-moment estimator
         E[eps^2] rather than the variance E[(eps - mu)^2]".
         """
-        pipeline = APGIPipeline({**CONFIG, "seed": 1})
+        pipeline = APGIPipeline({**CONFIG, "seed": 1, "alpha_e": 0.05, "alpha_i": 0.05})
         # Drive a strongly biased error stream; a second-moment estimator would
         # keep growing with the mean, a true variance would not.
         for _ in range(500):

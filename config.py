@@ -5,6 +5,20 @@ CONFIG = {
     # so a run is bit-for-bit reproducible from this value alone. None =
     # non-deterministic (OS entropy); set an int for any published result.
     "seed": None,
+    # Model form (SSOT §9): "ssot_core" = the APGI v1.2 minimal core (core/ssot_core.py);
+    # "legacy_v1_1" = the v1.1 pipeline, used automatically when an extension is enabled.
+    "model_form": "ssot_core",
+    # Reference windows of EQ-STD-1 (s), separate from the precision EMA (EQ-EMA-1/2).
+    "T_window_e": 5.0,
+    "T_window_i": 10.0,
+    # Relative-precision normalizers Π̄ (EQ-PREC-REL-1); measured per study.
+    "pi_bar_e": 1.0,
+    "pi_bar_i": 1.0,
+    # Fast refractory term r(t) (EQ-REF-1; extension, off by default) and urgency (EQ-URG-1).
+    "tau_ref": 0.3,
+    "delta_ref": 0.0,
+    "u_max": 0.0,
+    "tau_u": 1.0,
     # Fail closed on spec violations. strict=True (default) raises on a
     # configuration that violates the mathematical support of any parameter,
     # so an invalid run can never masquerade as a valid one. Set False only
@@ -16,8 +30,8 @@ CONFIG = {
     # Parameters table). 0.55 is the band midpoint. The previous default of
     # 1.0 sat outside the canonical range, so every out-of-the-box run was
     # non-canonical.
-    "theta_0": 0.55,
-    "theta_base": 0.55,
+    "theta_0": 0.35,
+    "theta_base": 0.35,  # θ₀ = 0.35 AU (SSOT §4.1, registry theta_baseline)
     "sigma2_e0": 1.0,
     "sigma2_i0": 1.0,
     # Numerical stability
@@ -34,8 +48,8 @@ CONFIG = {
     "theta_clip_min": 0.0,
     "theta_clip_max": 20.0,
     # EMA variance update
-    "alpha_e": 0.05,
-    "alpha_i": 0.05,
+    "alpha_e": 0.001998001332666933,  # 1 − exp(−dt/T_window_e), EQ-EMA-2
+    "alpha_i": 0.0009995001666250085,  # 1 − exp(−dt/T_window_i), EQ-EMA-2
     # Variance estimation method
     "variance_method": "ema",  # "ema" or "sliding_window"
     "T_win": 50,  # Sliding window size (only used if variance_method == "sliding_window")
@@ -53,8 +67,8 @@ CONFIG = {
     # parameter — despite the historical key names below, this is the
     # dopaminergic reward-prediction-error bias, distinct from β_SM and
     # β_somatic (see the Somatic Marker block further down).
-    "beta": 1.15,  # β_DA — alias for beta_da (backward compatibility)
-    "beta_da": 1.15,  # β_DA — spec-preferred name (alias for backward compatibility)
+    "beta": 0.0,  # β_DA — alias for beta_da (backward compatibility)
+    "beta_da": 0.0,  # SSOT §4.2 default β_DA = 0  # β_DA — spec-preferred name (alias for backward compatibility)
     # --- Somatic marker parameters — THREE mathematically distinct β
     # symbols per Notation Appendix "β RANGE RECONCILIATION" / Cross-Series
     # Notation Consistency table. Never merge these into one range:
@@ -82,7 +96,7 @@ CONFIG = {
     "ne_on_precision": True,
     "ne_on_threshold": False,
     # NE modulation strength — spec constraint: γ_NE · g_NE ≤ 0.5
-    "gamma_ne": 0.1,
+    "gamma_ne": 0.0,  # R6: no default sign; 0 removes the NE threshold route
     # Threshold mean-reversion timescale τ_θ (s). The per-step decay exponent
     # is γ_θ·dt = dt/τ_θ, computed by decay_exponent() below, never stored:
     # the former per-step constant "kappa" = 0.15 at dt = 0.5 s implied
@@ -127,7 +141,7 @@ CONFIG = {
     # Ignition dynamics
     "ignite_tau": 0.5,  # Spec alias: tau_sigma
     "tau_sigma": 0.5,  # Spec-preferred name (alias for backward compatibility)
-    "stochastic_ignition": False,
+    "stochastic_ignition": True,  # EQ-HAZARD-1 is the canonical sampler
     # Maximal ignition rate r_max (s⁻¹) of the dt-invariant hazard
     # P(B=1) = 1 − exp(−r_max·Bₜ·dt) (Math Spec Eq. 35). The corpus fits it per
     # study; 100 s⁻¹ = 1/dt₀ makes the hazard agree with the former per-step
@@ -184,8 +198,8 @@ CONFIG = {
     # Precision coupling ODE (continuous-time Π cascade)
     "use_hierarchical_precision_ode": False,
     "tau_pi": 1000.0,  # s (precision decay; v1.2 design lower bound 1 s)
-    "C_down": 0.1,
-    "C_up": 0.05,
+    "C_down": 0.0001,  # = 0.1/τ_Π (Paper 3 gain C_down·τ_Π = 0.1; PD-LOOP-GAIN, author decision 2026-11-25)
+    "C_up": 0.00005,  # = 0.05/τ_Π (C_up·τ_Π = 0.05); loop gain (C_down·τ_Π)(C_up·τ_Π)γ_ψ² = 0.02
     # Bottom-up nonlinear transfer ψ(ε_{ℓ-1}) in precision coupling ODE
     # Options: "identity", "tanh", "softsign".
     # Canonical is "tanh": MathSpec §2 and the Notation Appendix both define

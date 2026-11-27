@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from core import ssot_core as _ssot_core
+
 import warnings
 from collections import deque
 from collections.abc import MutableSequence
@@ -141,11 +143,17 @@ class APGIPipeline:
         Returns:
             JSON-serialisable manifest dictionary.
         """
-        return build_manifest(
+        m = build_manifest(
             self.config,
             extra=dict(extra) or None,
             validation_warnings=self._validation_warnings,
         )
+        m["model_form"] = getattr(self, "model_form", self.config.get("model_form"))
+        m["extensions_active"] = list(getattr(self, "extensions_active", []))
+        m["operating_point"] = _ssot_core.operating_point(
+            1.0 / float(self.config["ignite_tau"]), float(self.config["theta_base"]), float(self.config["r_max"])
+        )
+        return m
 
     def write_manifest(self, path: str, **extra: object) -> object:
         """Write this run's provenance manifest to ``path`` as JSON.
@@ -181,13 +189,13 @@ class APGIPipeline:
         """
         if not self.config.get("ne_on_threshold", False):
             return
-        gamma_ne = float(self.config.get("gamma_ne", 0.1))
+        gamma_ne = float(self.config.get("gamma_ne") or 0.0)
         g_ne = float(self.config.get("g_ne", 1.0))
-        if gamma_ne <= 0.0:
+        if gamma_ne == 0.0:
             return
-        product = gamma_ne * g_ne
+        product = abs(gamma_ne) * g_ne
         if product > self.NE_CLAMP_MAX:
-            rescaled = self.NE_CLAMP_MAX / gamma_ne
+            rescaled = self.NE_CLAMP_MAX / abs(gamma_ne)
             msg = (
                 f"γ_NE·g_NE = {product:.3f} exceeds the spec-mandated ceiling "
                 f"{self.NE_CLAMP_MAX}; rescaling g_NE {g_ne:.3f} → {rescaled:.3f} "
@@ -635,6 +643,34 @@ class APGIPipeline:
         # Multiscale signal tracking for spectral validation
         self.multiscale_signal_history: list[float] = []
         self.per_level_history: list[list[float]] = []
+        # Model form (SSOT §9). "ssot_core" is CFG-CORE / CFG-CORE-R: the canonical 15-step
+        # pipeline in core/ssot_core.py. Any enabled extension module runs on the v1.1
+        # pipeline ("legacy_v1_1"), which is labelled as such and is not the minimal core.
+        self.model_form = self.config.get("model_form", "ssot_core")
+        _extensions = {
+            "hierarchical": self.hierarchical is not None,
+            "resonance": self.resonance_system is not None,
+            "circadian": self.circadian_regulator is not None,
+            "reservoir": self.reservoir is not None,
+            "kuramoto": self.kuramoto is not None,
+            "observables": any(o is not None for o in (self.neural_observables, self.behavioral_observables, self.prediction_validator)),
+            "stability": self.stability_analyzer is not None,
+            "active_inference": self.active_inference_agent is not None,
+            "thermodynamic_cost": bool(self.config.get("use_thermodynamic_cost", False)),
+            "bold_calibration": bool(self.config.get("use_bold_calibration", False)),
+            "sliding_window_variance": self.stats_e is not None,
+            "canonical_discrete_mode": bool(self.config.get("use_canonical_discrete_mode", False)),
+            "somatic_dynamics": bool(self.config.get("use_somatic_precision", False)),
+            "continuous_threshold_ode": bool(self.config.get("use_continuous_threshold_ode", False)),
+            "reservoir_as_threshold": bool(self.config.get("reservoir_as_threshold", False)),
+        }
+        self.extensions_active = sorted(k for k, v in _extensions.items() if v)
+        if self.model_form == "ssot_core" and self.extensions_active:
+            self.model_form = "legacy_v1_1"
+        if self.model_form not in ("ssot_core", "legacy_v1_1"):
+            raise ValueError(f"model_form must be 'ssot_core' or 'legacy_v1_1', got {self.model_form!r}")
+        self.config["model_form"] = self.model_form
+        self._ssot = _ssot_core.SSOTCore(self.config)
         # Thermodynamic cost history if enabled (§11)
         if self.config.get("use_thermodynamic_cost", False):
             self.history["C_landauer"] = _new_history_buffer(self.history_maxlen)
@@ -653,6 +689,10 @@ class APGIPipeline:
         x_i = require_finite_scalar("x_i", x_i)
         x_hat_e = require_optional_finite_scalar("x_hat_e", x_hat_e)
         x_hat_i = require_optional_finite_scalar("x_hat_i", x_hat_i)
+        # APGI v1.2 minimal core (SSOT §8): the default model form. Extensions run on the
+        # v1.1 pipeline below, labelled model_form="legacy_v1_1" in the config and manifest.
+        if self.model_form == "ssot_core":
+            return _ssot_core.step(self, x_e, x_i, x_hat_e, x_hat_i)
         # Use provided predictions or internalized ones per §1.4
         _x_hat_e = x_hat_e if x_hat_e is not None else self.x_hat_e
         _x_hat_i = x_hat_i if x_hat_i is not None else self.x_hat_i
