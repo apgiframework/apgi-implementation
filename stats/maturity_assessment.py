@@ -115,7 +115,10 @@ def assess_hierarchical_architecture(
                         )
                         if baseline_mean > 1e-6:
                             suppression = 1.0 - (float(np.mean(theta_supra)) / baseline_mean)
-                            cascade_effects.append(max(0.0, suppression))  # Suppression is positive
+                            # A suppression is a fraction in [0, 1]: thresholds are ≥ θ_floor = 0,
+                            # so θ̄_supra ≥ 0 bounds it by 1. Clipping keeps the score in
+                            # [0, 100] for inputs outside that domain (F17).
+                            cascade_effects.append(min(1.0, max(0.0, suppression)))
 
         if cascade_effects:
             cascade_score = float(np.mean(cascade_effects) * 100)

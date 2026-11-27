@@ -17,10 +17,10 @@
   },
   "staging": {
     "config": "configs/staging.toml",
-    "digest": "882823e83242b2f6dc71d0218b7f5bb5a1bb1ff73eeabac064c87cd66805d60e",
-    "final_S": 0.025627082,
-    "final_theta": 20.0,
-    "ignition_count": 1.0,
+    "digest": "333d86306096046bdd75f806fec545a085f78f907299a60110339c06351ebacc",
+    "final_S": 0.038048215,
+    "final_theta": 1.833322252,
+    "ignition_count": 2.0,
     "steps": 100
   }
 }

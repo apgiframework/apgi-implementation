@@ -70,8 +70,8 @@ class TestAPGIConfigDefaults:
         """Should have correct default NE settings."""
         config = APGIConfig()
         assert config.ne_on_precision is True
-        assert config.ne_on_threshold is False
-        assert config.gamma_ne == 0.1
+        assert config.ne_on_threshold is True  # SSOT §11: both pathways (SSOT-P13)
+        assert config.gamma_ne == 0.0  # R6: no default sign
         assert not hasattr(config, "kappa")  # bare κ is reserved for ATP/bit
 
     def test_default_signal_accumulation(self):
@@ -280,14 +280,10 @@ class TestAPGIConfigValidation:
             APGIConfig(beta=-0.1)
 
     def test_gamma_ne_range(self):
-        """Should enforce 0 <= gamma_ne <= 1."""
-        with pytest.raises(ValidationError):
-            APGIConfig(gamma_ne=-0.1)
-        with pytest.raises(ValidationError):
-            APGIConfig(gamma_ne=1.1)
-        # Boundary values should work
-        APGIConfig(gamma_ne=0)
-        APGIConfig(gamma_ne=1.0)
+        """γ_NE is signed with no default sign (R6); its bound is the pipeline clamp
+        |γ_NE|·g_NE ≤ 0.5 (EQ-NE-1), not a schema range."""
+        for v in (-0.1, 0.0, 1.0, 1.1):
+            assert APGIConfig(gamma_ne=v).gamma_ne == v
 
     def test_kappa_field_retired(self):
         """The stored per-step exponent kappa is gone: τ_θ (validated > 0) replaces it."""
@@ -510,24 +506,19 @@ class TestAPGIConfigValidation:
 class TestAPGIConfigModelValidators:
     """Tests for APGIConfig model-level validators."""
 
-    def test_ne_double_counting_prevention(self):
-        """Should prevent NE from modulating both precision and threshold."""
-        # Valid: only one is True (with valid gamma_ne for threshold mode)
-        APGIConfig(ne_on_precision=True, ne_on_threshold=False)
-        APGIConfig(ne_on_precision=False, ne_on_threshold=True, gamma_ne=0.01, kappa=0.15)
-        # Invalid: both True
-        with pytest.raises(ValidationError) as exc_info:
-            APGIConfig(ne_on_precision=True, ne_on_threshold=True, gamma_ne=0.01, kappa=0.15)
-        assert "NE cannot modulate both" in str(exc_info.value)
+    def test_both_ne_pathways_are_accepted(self):
+        """SSOT §11 / EQ-THEFF-1 (SSOT-P13): both NE pathways share one clamped g_NE,
+        so the schema accepts them together, and the shipped default enables both."""
+        cfg = APGIConfig(ne_on_precision=True, ne_on_threshold=True, gamma_ne=0.01, kappa=0.15)
+        assert cfg.ne_on_precision and cfg.ne_on_threshold
+        assert APGIConfig().gamma_ne == 0.0  # R6: no default sign
 
-    def test_ne_threshold_stability_validation(self):
-        """Should validate NE threshold mode parameters."""
-        # Valid: low gamma_ne with high kappa (must set ne_on_precision=False to avoid double counting)
-        APGIConfig(ne_on_threshold=True, ne_on_precision=False, gamma_ne=0.01, kappa=0.15)
-        # Invalid: high gamma_ne causes instability
-        with pytest.raises(ValidationError) as exc_info:
-            APGIConfig(ne_on_threshold=True, ne_on_precision=False, gamma_ne=0.1, kappa=0.15)
-        assert "threshold instability" in str(exc_info.value)
+    @pytest.mark.parametrize("gamma_ne", [0.2, -0.3, 1.0])
+    def test_gamma_ne_is_signed_and_not_rejected(self, gamma_ne):
+        """γ_NE is fitted with no default sign (R6); its only bound is the clamp
+        |γ_NE|·g_NE ≤ 0.5 (EQ-NE-1), which the pipeline applies by rescaling g_NE."""
+        cfg = APGIConfig(ne_on_precision=True, ne_on_threshold=True, gamma_ne=gamma_ne, kappa=0.15)
+        assert cfg.gamma_ne == gamma_ne
 
     def test_dt_stability_validation(self):
         """Should validate dt against minimum timescale."""

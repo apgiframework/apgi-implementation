@@ -71,6 +71,7 @@ def hierarchical_threshold_modulation(
     pis: np.ndarray,
     phases: np.ndarray,
     kappa_down: float,
+    pi_max: float | None = None,
 ) -> np.ndarray:
     """Apply phase modulation to all hierarchy levels.
     Each level is modulated by the phase of the level above it.
@@ -80,13 +81,22 @@ def hierarchical_threshold_modulation(
         pis: Precisions for each level [L]
         phases: Phases for each level [L]
         kappa_down: Downward phase coupling strength
+        pi_max: When given, the canonical EQ-MS-4 form (SSOT §10.7) is used:
+            θ_l = θ_{0,l}·clip(1 + κ_down·(Π_{l+1}/Π_max)·cos φ_{l+1}, 0.5, 1.5).
+            None keeps the unnormalized v1.1 form (SSOT-P12), for callers
+            outside the pipeline only.
     Returns:
         Modulated thresholds [L]
     """
     n = len(thetas)
     thetas_mod = np.zeros(n)
     for level in range(n):
-        if level < n - 1:
+        if level < n - 1 and pi_max is not None:
+            if not pi_max > 0.0:
+                raise ValueError(f"pi_max must be > 0, got {pi_max}")
+            factor = 1.0 + kappa_down * (pis[level + 1] / pi_max) * np.cos(phases[level + 1])
+            thetas_mod[level] = thetas[level] * min(1.5, max(0.5, factor))
+        elif level < n - 1:
             # Modulated by higher level
             thetas_mod[level] = modulate_threshold_by_phase(
                 thetas[level], pis[level + 1], phases[level + 1], kappa_down

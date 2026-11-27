@@ -117,13 +117,21 @@ class TestThresholdFormula:
         assert thetas_zero[0] > thetas_halfpi[0]
 
     def test_threshold_spec_formula_numerically(self):
-        """Verify θ_0 = θ₀_0 · (1 + κ · Π_1 · cos(φ_1)) matches implementation."""
+        """EQ-MS-4: θ_0 = θ₀_0 · clip(1 + κ · (Π_1/Π_max) · cos(φ_1), 0.5, 1.5)."""
         sys = _make_system(kappa_down=0.2)
         sys.phi = np.array([0.0, np.pi / 3.0, 0.0])
         sys.pi = np.array([1.0, 2.0, 1.0])
         thetas = sys._compute_thresholds()
-        expected_theta_0 = 1.0 * (1.0 + 0.2 * 2.0 * np.cos(np.pi / 3.0))
+        expected_theta_0 = 1.0 * (1.0 + 0.2 * (2.0 / sys.pi_max) * np.cos(np.pi / 3.0))
         assert thetas[0] == pytest.approx(expected_theta_0, rel=1e-9)
+
+    def test_threshold_factor_band(self):
+        """EQ-MS-4 bounds the factor in [0.5, 1.5] whatever κ_down and Π are (SSOT-P12)."""
+        sys = _make_system(kappa_down=5.0)
+        sys.pi = np.full(3, sys.pi_max)
+        for phase, expected in ((0.0, 1.5), (np.pi, 0.5)):
+            sys.phi = np.full(3, phase)
+            assert sys._compute_thresholds()[0] == pytest.approx(expected, rel=1e-12)
 
     def test_threshold_clamped_within_bounds(self):
         """Modulated thresholds must respect theta_min and theta_max clamps."""

@@ -44,7 +44,9 @@ class TestPipelineSerotonin:
         from config import CONFIG
         from pipeline import APGIPipeline
 
-        cfg = {**CONFIG, "beta_5ht": beta_5ht}
+        # One seed for both runs: the ignition draws must be common random numbers,
+        # otherwise the comparison measures event noise, not β_5HT (F17).
+        cfg = {**CONFIG, "beta_5ht": beta_5ht, "seed": 11}
         pipe = APGIPipeline(cfg)
         thetas = []
         rng = np.random.default_rng(42)

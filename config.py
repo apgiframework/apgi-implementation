@@ -89,12 +89,16 @@ CONFIG = {
     "BETA_SM_RANGE": (0.1, 1.2),  # canonical range for β_SM
     "BETA_SM_WAKING_RANGE": (0.3, 0.8),  # typical waking sub-band for β_SM
     "BETA_SOMATIC_LINEAR_RANGE": (0.5, 2.5),  # canonical range for β_somatic (linear form)
-    # NE modulates BOTH Π_sal (precision) AND η_θ (threshold gain) per spec.
-    # Enabling both simultaneously is allowed by the spec but requires γ_NE·g_NE ≤ 0.5.
-    # Default: precision only (ne_on_threshold=False) to avoid accidental instability.
-    # Set ne_on_threshold=True AND lower gamma_ne (≤0.01) to enable both pathways.
+    # NE acts through BOTH pathways (SSOT §11, NE row: "both pathways share one
+    # clamped g_NE"; EQ-THEFF-1): Πⁱ_eff = g_NE·Πⁱ and θ_eff = θ·(1 + γ_NE·g_NE),
+    # with the hard clamp |γ_NE|·g_NE ≤ 0.5. The default γ_NE = 0 makes the
+    # threshold factor exactly 1, so default runs are unchanged. Disabling either
+    # flag is a non-canonical variant (SSOT-P13: the former default
+    # ne_on_threshold=False silently dropped the threshold pathway whenever
+    # γ_NE ≠ 0; its stated reason, instability, came from the write-back defect
+    # SSOT-P5, which is resolved).
     "ne_on_precision": True,
-    "ne_on_threshold": False,
+    "ne_on_threshold": True,
     # NE modulation strength — spec constraint: γ_NE · g_NE ≤ 0.5
     "gamma_ne": 0.0,  # R6: no default sign; 0 removes the NE threshold route
     # Threshold mean-reversion timescale τ_θ (s). The per-step decay exponent
@@ -123,7 +127,6 @@ CONFIG = {
     "delta": 0.5,
     # 9) Post-ignition signal reset (§6)
     "RHO_RETAIN": 0.1,  # Matches Spec §6.1; strong reset (retains 10%, clears 90%)
-    "DELTA_RESET": 0.5,  # Baseline threshold boost post-ignition
     "reset_factor": 0.1,  # Alias for RHO_RETAIN (backward compatibility)
     # 10) Threshold Adaptation Timescales (Audit HIGH-4)
     "TAU_THETA_ALLOSTATIC": 20.0,  # 10-30s range; governing θ₀ (metabolic)

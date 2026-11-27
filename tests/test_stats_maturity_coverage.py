@@ -15,10 +15,12 @@ from stats.maturity_assessment import (
 
 
 def test_assess_hierarchical_architecture():
-    # Mock data for 2 levels
-    signal_levels = [np.random.randn(200), np.random.randn(200)]
-    theta_levels = [np.random.randn(200), np.random.randn(200)]
-    phi_levels = [np.random.randn(200), np.random.randn(200)]
+    # Mock data for 2 levels (seeded: the scores must stay in [0, 100] for any draw;
+    # seed 2 gave a cascade score of 516 before the F17 clip)
+    rng = np.random.default_rng(2)
+    signal_levels = [rng.standard_normal(200), rng.standard_normal(200)]
+    theta_levels = [rng.standard_normal(200), rng.standard_normal(200)]
+    phi_levels = [rng.standard_normal(200), rng.standard_normal(200)]
     pi_levels = [np.ones(200), np.ones(200)]
     pac, cascade, coh, issues, recs = assess_hierarchical_architecture(
         signal_levels, theta_levels, phi_levels, pi_levels

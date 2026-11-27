@@ -536,6 +536,7 @@ class APGIPipeline:
                 kappa_up=self.config.get("resonance_kappa_up", 0.0),
                 phi_noise_std=self.config.get("resonance_phi_noise_std", 0.0),
                 use_ou_phase_noise=self.config.get("resonance_use_ou_phase_noise", True),
+                pi_max=float(self.config.get("pi_max", 10.0)),
             )
         # Somatic marker state if enabled
         self.M = self.config.get("M_somatic", 0.0)  # Somatic marker M(c,a) ∈ [-2, +2]
@@ -956,9 +957,15 @@ class APGIPipeline:
                 # signal (S* = tau_s × Π·φ for both paths).  This keeps resonance_S_levels
                 # meaningful for diagnostic outputs and the maturity cascade metric.
                 # self.S is still accumulated via the ODE below — ignition is independent.
-                _S_inst_diag = np.full(
-                    self.n_levels, (pi_e_eff * phi_e_n + pi_i_eff * phi_i_eff) * tau_s
-                )
+                # With the precision ODE on, the ODE-weighted S_inst is the drive
+                # (SSOT-P10 a); otherwise the single-scale inverse-variance drive.
+                if self.hierarchical_network is not None and self.config.get(
+                    "use_hierarchical_precision_ode", False
+                ):
+                    _drive_diag = S_inst
+                else:
+                    _drive_diag = pi_e_eff * phi_e_n + pi_i_eff * phi_i_eff
+                _S_inst_diag = np.full(self.n_levels, _drive_diag * tau_s)
                 self.resonance_system.step(_S_inst_diag, pi_levels, dt, noise_std=0.0)
                 # Sync live phases and precisions back to the hierarchical state so
                 # that hierarchical_threshold_modulation uses current resonance phases.
@@ -976,7 +983,33 @@ class APGIPipeline:
         # Choose between ODE (continuous) or discrete leaky accumulation.
         # When resonance is active it handles phases/thresholds only — S is always
         # accumulated via the ODE so that ignition dynamics are parameter-independent.
-        if self.resonance_system is not None:
+        #
+        # SSOT-P10 (a), SSOT §8 shortcuts / EQ-PREC-ODE-1: when the hierarchical
+        # precision ODE is on, its precisions are the only precisions in the
+        # simulation. S is then driven by the multiscale S_inst = Σ_l w_l·Π_l·φ(ε_l)·Γ_l
+        # built from the ODE precisions, and the precision-coupled noise uses the
+        # same weighted precision Σ_l w_l·Π_l, never the inverse-variance Πᵉ_eff, Πⁱ_eff.
+        ode_precision_active = (
+            self.use_hierarchical
+            and self.hierarchical_network is not None
+            and bool(self.config.get("use_hierarchical_precision_ode", False))
+        )
+        if ode_precision_active:
+            if self.hierarchical_network is None:  # pragma: no cover - narrowed above
+                raise RuntimeError("hierarchical_network is None")
+            _pi_total = float(np.sum(np.asarray(self.weights) * self.hierarchical_network.pi))
+            self.S = update_signal_ode(
+                self.S,
+                S_inst,
+                0.0,
+                1.0,
+                0.0,
+                tau_s,
+                dt,
+                compute_precision_coupled_noise_std(_pi_total, 0.0),
+                rng=self.rng,
+            )
+        elif self.resonance_system is not None:
             # ODE accumulation (resonance manages phases+thresholds, not S)
             self.S = update_signal_ode(
                 self.S,
@@ -1070,6 +1103,12 @@ class APGIPipeline:
         # δ·B(t-1) into its drift term, so step 9's discrete boost knows to
         # stand down and avoid double-applying the same refractory term.
         ode_drift_owns_refractory = False
+        # TC-11 read-out rule (SSOT §8, EQ-THEFF-1; SSOT-P12): the carried
+        # allostatic threshold θ(t+1) and the decision threshold θ_eff differ.
+        # NE, 5-HT, circadian and hierarchical (EQ-MS-4) modulation shape only
+        # θ_eff; none is written back into θ, so no factor compounds across
+        # steps. theta_carried stays None on paths without read-outs.
+        theta_carried: float | None = None
         if use_reservoir_threshold:
             # Mode B: Reservoir-as-threshold (spec-explicit alternative)
             # Reservoir dynamics replace allostatic threshold computation
@@ -1157,6 +1196,9 @@ class APGIPipeline:
             theta_next = threshold_decay(
                 theta_next, self.config["theta_base"], decay_exponent(self.config)
             )
+            # The carried allostatic state; everything below until the
+            # ignition decision builds the read-out θ_eff from it.
+            theta_carried = theta_next
             # 7c) Step 13 — NE multiplicative threshold modulation (§4.4).
             # g_NE has already been clamped so that γ_NE·g_NE ≤ 0.5.
             if self.config.get("ne_on_threshold", False):
@@ -1232,6 +1274,7 @@ class APGIPipeline:
                         pis=_pi_levels,
                         phases=np.array(self.hierarchical.phases),
                         kappa_down=self.config.get("kappa_phase", 0.1),
+                        pi_max=float(self.config.get("pi_max", 10.0)),
                     )
                     # Apply bottom-up cascade if enabled
                     if self.config.get("kappa_up", 0.0) > 0:
@@ -1251,6 +1294,13 @@ class APGIPipeline:
             theta_next = float(
                 np.clip(
                     theta_next,
+                    self.config.get("theta_clip_min", 0.0),
+                    self.config.get("theta_clip_max", 20.0),
+                )
+            )
+            theta_carried = float(
+                np.clip(
+                    theta_carried,
                     self.config.get("theta_clip_min", 0.0),
                     self.config.get("theta_clip_max", 20.0),
                 )
@@ -1285,7 +1335,11 @@ class APGIPipeline:
             # self.S was already reset via reset_factor above; resonance.primary_signal
             # is NOT used (S is ODE-accumulated), so only the theta boost is applied.
             if self.resonance_system is not None:
-                delta_ref_val = self.config.get("DELTA_RESET", self.config.get("delta", 0.5)) or 0.5
+                # One parameter, one value (SSOT-P10 b): the resonance-level copy
+                # rises by the configured δ_reset, the same `delta` that step 9
+                # adds to the carried threshold. The former DELTA_RESET key with
+                # `or 0.5` made δ_reset = 0 unreachable here.
+                delta_ref_val = float(self.config["delta"])
                 self.resonance_system.apply_level_ignition(
                     level=0,
                     rho_S=float(self.config.get("RHO_RETAIN", reset_factor) or reset_factor),
@@ -1303,6 +1357,10 @@ class APGIPipeline:
         # that boost into step t before the ODE runs). The two mechanisms are
         # mutually exclusive alternate formulations of the same refractory
         # term, never additive.
+        # The boost acts on the carried state, not on the read-out θ_eff used
+        # for the decision above (SSOT-P12, TC-11).
+        if theta_carried is not None:
+            theta_next = theta_carried
         if not ode_drift_owns_refractory:
             theta_next = apply_refractory_boost(theta_next, B_t, self.config["delta"])
         # NOTE: the mean-reversion decay is NOT applied here. It now runs at

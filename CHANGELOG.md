@@ -8,6 +8,35 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### SSOT alignment, legacy extension path (apgi-lean task 59b)
+
+Closes the open apgi-lean divergences SSOT-P10, SSOT-P12 and SSOT-P13. The
+default `ssot_core` path is unchanged (the prod and dev golden masters are
+bit-identical).
+
+#### Fixed
+- SSOT-P13: `ne_on_threshold` now defaults to True, so γ_NE ≠ 0 applies both NE
+  pathways with one clamped g_NE (SSOT §11, EQ-THEFF-1). The config schema no
+  longer rejects both pathways together or γ_NE ≥ 0.1, and `gamma_ne` defaults to
+  0 with no sign bound (R6); the clamp |γ_NE|·g_NE ≤ 0.5 stays in the pipeline.
+- SSOT-P12: hierarchical threshold coupling follows EQ-MS-4: the precision is
+  divided by Π_max and the factor bounded in [0.5, 1.5] (`NestedResonanceSystem`,
+  `hierarchical_threshold_modulation(pi_max=…)`). In the legacy path, NE, 5-HT,
+  circadian and hierarchical modulation are read-outs of the carried threshold
+  (TC-11) and are no longer written back, so no factor compounds.
+- SSOT-P10: with the hierarchical precision ODE on, S is driven by the ODE
+  precisions only (multiscale S_inst and its precision-coupled noise); the
+  resonance-level reset uses the configured `delta`. The unused `DELTA_RESET` key
+  (whose `or 0.5` made δ_reset = 0 unreachable) is removed.
+- F17: `assess_hierarchical_architecture` could report a cascade score above 100;
+  the suppression fraction is clipped to [0, 1]. Two tests that compared unseeded
+  runs (flaky about 1 in 5 at 8d8e5bd) are seeded.
+
+#### Changed
+- Golden master `staging` (full hierarchy): final θ 20.0 → 1.833 AU, ignitions
+  1 → 2. The old trajectory sat at the 20 AU numerical guard because of the
+  SSOT-P12 write-back.
+
 ### Audit remediation (APGI 1.2 Software Validation Specification)
 
 Closes the code defects recorded in the 2026-11-05 audit register and advances

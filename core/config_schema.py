@@ -54,8 +54,17 @@ class APGIConfig(BaseModel):
     )
     # NE double counting prevention
     ne_on_precision: bool = Field(default=True, description="NE modulates precision")
-    ne_on_threshold: bool = Field(default=False, description="NE modulates threshold")
-    gamma_ne: float = Field(default=0.1, ge=0, le=1, description="NE modulation strength")
+    ne_on_threshold: bool = Field(
+        default=True, description="NE modulates threshold (both pathways canonical, SSOT §11)"
+    )
+    gamma_ne: float = Field(
+        default=0.0,
+        description=(
+            "Signed NE threshold coupling γ_NE (SSOT R6: no default sign; 0 removes the "
+            "NE threshold route). Bounded only through the clamp |γ_NE|·g_NE ≤ 0.5 "
+            "(EQ-NE-1), which the pipeline enforces by rescaling g_NE."
+        ),
+    )
     # Signal accumulation
     lam: float = Field(
         default=0.0327838995179941,
@@ -217,7 +226,6 @@ class APGIConfig(BaseModel):
     )
     # Post-ignition reset (uppercase spec-mirroring aliases)
     RHO_RETAIN: float = Field(default=0.1, gt=0, lt=1, description="Signal retention fraction ρ")
-    DELTA_RESET: float = Field(default=0.5, ge=0, description="Post-ignition threshold boost")
     # Precision coupling ODE (hierarchical)
     tau_pi: float = Field(default=1000.0, gt=0, description="Precision decay time constant (s)")
     C_down: float = Field(default=0.1, ge=0, description="Top-down precision coupling strength")
@@ -303,25 +311,14 @@ class APGIConfig(BaseModel):
             raise ValueError("pi_max must be greater than pi_min")
         return v
 
-    @model_validator(mode="after")
-    def validate_ne_separation(self) -> APGIConfig:
-        """Prevent NE double-counting (Spec §2.3-2.4)."""
-        if self.ne_on_precision and self.ne_on_threshold:
-            raise ValueError(
-                "NE cannot modulate both precision and threshold. "
-                "Set exactly one to True. Spec §2.3-2.4."
-            )
-        return self
-
-    @model_validator(mode="after")
-    def validate_ne_threshold_stability(self) -> APGIConfig:
-        """Validate NE threshold mode parameters for stability."""
-        if self.ne_on_threshold and self.gamma_ne >= 0.1:
-            raise ValueError(
-                f"ne_on_threshold=True with gamma_ne={self.gamma_ne} causes threshold instability. "
-                "Use gamma_ne <= 0.01 or a faster threshold decay. Spec §4.4."
-            )
-        return self
+    # NE pathways (SSOT §11, EQ-THEFF-1, EQ-NE-1; SSOT-P13): both pathways are
+    # canonical and share one clamped g_NE, so the schema accepts
+    # ne_on_precision and ne_on_threshold together. The former validators
+    # rejected that combination and any γ_NE ≥ 0.1 with the threshold pathway;
+    # both rules predate the read-out fix SSOT-P5 and contradict the SSOT. The
+    # clamp |γ_NE|·g_NE ≤ 0.5 is enforced where the SSOT prescribes it, in the
+    # pipeline (rescale g_NE, not reject); stiffness relative to θ recovery is
+    # a heuristic warning there, not a schema error.
 
     @model_validator(mode="after")
     def validate_dt_stability(self) -> APGIConfig:

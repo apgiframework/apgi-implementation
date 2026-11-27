@@ -15,12 +15,9 @@ def test_apgi_config_validation_failures():
     # pi_max > pi_min
     with pytest.raises(ValidationError, match="pi_max must be greater than pi_min"):
         APGIConfig(pi_min=100, pi_max=50)
-    # NE separation
-    with pytest.raises(ValidationError, match="NE cannot modulate both"):
-        APGIConfig(ne_on_precision=True, ne_on_threshold=True)
-    # NE threshold stability
-    with pytest.raises(ValidationError, match="causes threshold instability"):
-        APGIConfig(ne_on_precision=False, ne_on_threshold=True, gamma_ne=0.2)
+    # NE: both pathways together are canonical (SSOT-P13), so neither raises
+    APGIConfig(ne_on_precision=True, ne_on_threshold=True)
+    APGIConfig(ne_on_precision=False, ne_on_threshold=True, gamma_ne=0.2)
     # dt stability
     with pytest.raises(ValidationError, match="exceeds max"):
         APGIConfig(dt=2.0, tau_s=5.0)

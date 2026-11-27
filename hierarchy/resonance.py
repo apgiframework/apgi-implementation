@@ -96,6 +96,7 @@ class NestedResonanceSystem:
         use_ou_phase_noise: bool = True,
         ou_tau_xi: float = 1.0,
         rng: RNGLike = None,
+        pi_max: float = 10.0,
     ) -> None:
         if n_levels < 1:
             raise ValueError("n_levels must be >= 1")
@@ -107,6 +108,9 @@ class NestedResonanceSystem:
         self.kappa_up = float(kappa_up)
         self.theta_min = float(theta_min)
         self.theta_max = float(theta_max)
+        if not pi_max > 0.0:
+            raise ValueError(f"pi_max must be > 0, got {pi_max}")
+        self.pi_max = float(pi_max)
         self.phi_noise_std = float(phi_noise_std)
         self.use_ou_phase_noise = bool(use_ou_phase_noise)
         self.rng = resolve_rng(rng)
@@ -160,8 +164,8 @@ class NestedResonanceSystem:
         self.pi = pi.copy()
         # 1 — Phase advancement with top-down Kuramoto entrainment
         self.phi = self._advance_phases(dt)
-        # 2 — Threshold update using the spec formula:
-        #     θ_l = θ_{0,l} · (1 + κ_down · Π_{l+1} · cos(φ_{l+1}))
+        # 2 — Threshold update using EQ-MS-4:
+        #     θ_l = θ_{0,l} · clip(1 + κ_down · (Π_{l+1}/Π_max) · cos(φ_{l+1}), 0.5, 1.5)
         self.theta = self._compute_thresholds()
         # 3 — Per-level leaky accumulation with optional SDE noise (spec §12):
         #     S_l(t+1) = max(0, (1 − λ_l)·S_l + λ_l·S_inst_l + σ·√dt·ξ_l)
@@ -305,15 +309,20 @@ class NestedResonanceSystem:
         return phi_new
 
     def _compute_thresholds(self) -> np.ndarray:
-        """Apply the §8 spec formula to all levels.
-        θ_l = θ_{0,l} · (1 + κ_down · Π_{l+1} · cos(φ_{l+1}))
-        The top level has no level above it, so it stays at its baseline θ_{0,L-1}.
+        """Apply EQ-MS-4 (SSOT §10.7) to all levels.
+        θ_l = θ_{0,l} · clip(1 + κ_down · (Π_{l+1}/Π_max) · cos(φ_{l+1}), 0.5, 1.5)
+        The precision is normalized by Π_max and the factor bounded in [0.5, 1.5]
+        (SSOT-P12; the former form without /Π_max spanned [0, 2] at Π_max = 10,
+        κ_down = 0.1). The top level has no level above it, so it stays at its
+        baseline θ_{0,L-1}.
         """
         thetas = np.empty(self.n_levels)
         for level in range(self.n_levels):
             if level < self.n_levels - 1:
-                mod = 1.0 + self.kappa_down * self.pi[level + 1] * np.cos(self.phi[level + 1])
-                thetas[level] = self.theta_0[level] * mod
+                mod = 1.0 + self.kappa_down * (self.pi[level + 1] / self.pi_max) * np.cos(
+                    self.phi[level + 1]
+                )
+                thetas[level] = self.theta_0[level] * min(1.5, max(0.5, mod))
             else:
                 thetas[level] = self.theta_0[level]
         return np.clip(thetas, self.theta_min, self.theta_max)
@@ -331,6 +340,7 @@ def build_resonance_system(
     phi_noise_std: float = 0.0,
     use_ou_phase_noise: bool = True,
     rng: RNGLike = None,
+    pi_max: float = 10.0,
 ) -> NestedResonanceSystem:
     """Convenience factory: build a NestedResonanceSystem from pipeline timescales.
     Parameters
@@ -358,4 +368,5 @@ def build_resonance_system(
         phi_noise_std=phi_noise_std,
         use_ou_phase_noise=use_ou_phase_noise,
         rng=rng,
+        pi_max=pi_max,
     )
