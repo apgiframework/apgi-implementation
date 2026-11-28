@@ -19,7 +19,6 @@ from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_va
 
 from core.deprecation import warn_renamed
 
-
 #: τ_σ default = 1/γ_sig at the declared operating point OP-V12 (γ_sig = 7.5; B-13).
 DEFAULT_IGNITE_TAU = 1.0 / 7.5
 
