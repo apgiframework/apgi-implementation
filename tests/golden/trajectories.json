@@ -9,18 +9,18 @@
   },
   "prod": {
     "config": "configs/prod.toml",
-    "digest": "969eb5db16e1c0cb75e1b51dd45ded5f6b38c9ec30ceef0899a60a3ca7bd0dcd",
-    "final_S": 0.131108886,
-    "final_theta": 3.129748842,
-    "ignition_count": 7.0,
+    "digest": "f9be745b2c0cd2bfcb502ef02922052fc76b6cef3878e27b85822cd1cf9cefa8",
+    "final_S": 0.102485947,
+    "final_theta": 2.225173689,
+    "ignition_count": 5.0,
     "steps": 200
   },
   "staging": {
     "config": "configs/staging.toml",
-    "digest": "333d86306096046bdd75f806fec545a085f78f907299a60110339c06351ebacc",
-    "final_S": 0.038048215,
-    "final_theta": 1.833322252,
-    "ignition_count": 2.0,
+    "digest": "d23eee8f7df2c4648dbae0c59c50a73d759035d77ca99b0f628ba8342188b770",
+    "final_S": 0.036993826,
+    "final_theta": 0.852004567,
+    "ignition_count": 0.0,
     "steps": 100
   }
 }

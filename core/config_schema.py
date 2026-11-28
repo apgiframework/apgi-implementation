@@ -20,6 +20,10 @@ from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_va
 from core.deprecation import warn_renamed
 
 
+#: τ_σ default = 1/γ_sig at the declared operating point OP-V12 (γ_sig = 7.5; B-13).
+DEFAULT_IGNITE_TAU = 1.0 / 7.5
+
+
 class APGIConfig(BaseModel):
     """Production-grade APGI configuration with strict validation.
     All parameters validated at initialization with clear error messages.
@@ -101,7 +105,9 @@ class APGIConfig(BaseModel):
     v1: float = Field(default=0.5, ge=0, description="Exteroceptive value weight")
     v2: float = Field(default=0.5, ge=0, description="Interoceptive value weight")
     # Ignition dynamics
-    ignite_tau: float = Field(default=0.5, gt=0, description="Ignition sigmoid temperature")
+    ignite_tau: float = Field(
+        default=DEFAULT_IGNITE_TAU, gt=0, description="Ignition sigmoid temperature, 1/7.5"
+    )
     tau_sigma: float | None = Field(
         default=None, description="Alias for ignite_tau (backward compatibility)"
     )
@@ -110,7 +116,7 @@ class APGIConfig(BaseModel):
     tau_s: float = Field(default=0.3, gt=0, description="Signal decay time constant (s)")
     dt: float = Field(default=0.01, gt=0, description="Integration time step (s); dt₀ = 10 ms")
     r_max: float = Field(
-        default=100.0, gt=0, description="Maximal ignition rate of the hazard (1/s)"
+        default=10.0, gt=0, description="Maximal ignition rate (1/s); OP-V12 design value"
     )
     noise_std: float = Field(default=0.01, ge=0, description="SDE diffusion coefficient")
     # Generative model dynamics
@@ -372,7 +378,7 @@ class APGIConfig(BaseModel):
         # 2. Ignition temperature (tau_sigma/ignite_tau)
         # Same precedence rule for the spec-preferred tau_sigma name.
         if self.tau_sigma is not None and (
-            abs(self.tau_sigma - self.ignite_tau) > 0.01 or self.ignite_tau == 0.5
+            abs(self.tau_sigma - self.ignite_tau) > 0.01 or self.ignite_tau == DEFAULT_IGNITE_TAU
         ):
             self.ignite_tau = self.tau_sigma
         return self

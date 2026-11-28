@@ -95,7 +95,7 @@ class TestAPGIConfigDefaults:
         assert config.tau_theta_recovery == 0.45
         assert config.tau_s == 0.3
         assert config.dt == 0.01
-        assert config.r_max == 100.0
+        assert config.r_max == 10.0  # OP-V12 design value (B-13)
 
     def test_default_hierarchical(self):
         """Should have correct default hierarchical settings."""
@@ -118,7 +118,7 @@ class TestAPGIConfigDefaults:
     def test_default_ignition(self):
         """Should have correct default ignition settings."""
         config = APGIConfig()
-        assert config.ignite_tau == 0.5
+        assert config.ignite_tau == 1.0 / 7.5  # τ_σ = 1/γ_sig at OP-V12 (B-13)
         assert config.tau_sigma is None
         assert config.stochastic_ignition is False
 
@@ -560,7 +560,7 @@ class TestAPGIConfigModelValidators:
 
     def test_backward_compat_tau_sigma(self):
         """Should apply tau_sigma when ignite_tau was default."""
-        config = APGIConfig(tau_sigma=0.7)  # ignite_tau defaults to 0.5
+        config = APGIConfig(tau_sigma=0.7)  # ignite_tau defaults to 1/7.5
         assert config.ignite_tau == 0.7
 
     def test_backward_compat_tau_sigma_identical(self):

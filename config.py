@@ -142,14 +142,18 @@ CONFIG = {
     "v1": 0.5,
     "v2": 0.5,
     # Ignition dynamics
-    "ignite_tau": 0.5,  # Spec alias: tau_sigma
-    "tau_sigma": 0.5,  # Spec-preferred name (alias for backward compatibility)
+    # τ_σ = 1/γ_sig with γ_sig = 7.5, the declared v1.2 operating point OP-V12 (B-13,
+    # apgi-lean configurations.json). The former 0.5 (γ_sig = 2) gave a soft floor of 0.33.
+    "ignite_tau": 1.0 / 7.5,  # Spec alias: tau_sigma
+    "tau_sigma": 1.0 / 7.5,  # Spec-preferred name (alias for backward compatibility)
     "stochastic_ignition": True,  # EQ-HAZARD-1 is the canonical sampler
     # Maximal ignition rate r_max (s⁻¹) of the dt-invariant hazard
     # P(B=1) = 1 − exp(−r_max·Bₜ·dt) (Math Spec Eq. 35). The corpus fits it per
     # study; 100 s⁻¹ = 1/dt₀ makes the hazard agree with the former per-step
     # Bernoulli(Bₜ) to first order at the reference step dt₀ = 10 ms.
-    "r_max": 100.0,
+    # OP-V12 (B-13): r_max = 10 s⁻¹ is a design value until fitted to data. The former
+    # placeholder 100 s⁻¹ gave about 33 stimulus-free events per second.
+    "r_max": 10.0,
     # Continuous-time signal ODE / SDE parameters
     # τ_S = 300 ms, the worked value (Notation Appendix p2; range 200–500 ms).
     # The former 5.0 s lay outside the published range.
@@ -365,3 +369,16 @@ def lam_from_tau_s(dt: float, tau_s: float) -> float:
     if tau_s <= 0:
         raise ValueError(f"tau_s must be > 0, got {tau_s}")
     return 1.0 - math.exp(-dt / tau_s)
+
+
+#: B-13: the declared v1.2 design operating point OP-V12 (apgi-lean specification/configurations.json).
+#: Every run reported as a model prediction uses it (or a fitted point): γ_sig·θ₀ = 4.65, soft floor
+#: σ(−4.65) ≈ 0.0095, stimulus-free hazard ≈ 0.095 s⁻¹ before noise. A named preset, not the default
+#: θ₀: CONFIG keeps the canonical θ₀ = 0.35 AU. Usage: {**CONFIG, **OPERATING_POINT_V12}.
+OPERATING_POINT_V12 = {
+    "theta_base": 0.62,
+    "theta_0": 0.62,
+    "ignite_tau": 1.0 / 7.5,
+    "tau_sigma": 1.0 / 7.5,
+    "r_max": 10.0,
+}

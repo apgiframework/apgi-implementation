@@ -198,7 +198,7 @@ def _validate_ignition_dynamics(config: dict) -> None:
     """Validate ignition mechanism constraints (§5.2).
     Spec §5.2: Sigmoid temperature τ_σ must be > 0
     """
-    tau_sigma = config.get("ignite_tau", 0.5)
+    tau_sigma = config.get("ignite_tau", 1.0 / 7.5)
     if tau_sigma <= 0:
         raise ValidationError(
             f"ignite_tau (τ_σ) must be > 0, got {tau_sigma}. Spec §5.2: P_ign = σ([S-θ]/τ_σ)"

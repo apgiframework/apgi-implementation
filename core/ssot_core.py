@@ -175,11 +175,12 @@ def _compute(
     theta = pipe.theta
     theta_eff = theta * ne_factor + core.r + float(cfg.get("beta_5ht", 0.0)) - u
     S = pipe.S
-    gamma_sig = 1.0 / float(cfg.get("ignite_tau", cfg.get("tau_sigma", 0.5)))
+    # τ_σ default 1/7.5: γ_sig = 7.5 at the declared operating point OP-V12 (B-13)
+    gamma_sig = 1.0 / float(cfg.get("ignite_tau", cfg.get("tau_sigma", 1.0 / 7.5)))
     margin = S - theta_eff
     b_prop = sigmoid(gamma_sig * margin)  # 8
     if cfg.get("stochastic_ignition", True):  # 9
-        p_hit = -math.expm1(-float(cfg.get("r_max", 100.0)) * b_prop * dt)
+        p_hit = -math.expm1(-float(cfg.get("r_max", 10.0)) * b_prop * dt)  # OP-V12 default
         B = int(pipe.rng.random() < p_hit)
     else:
         p_hit = float(margin > 0)
